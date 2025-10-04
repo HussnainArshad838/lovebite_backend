@@ -838,12 +838,4 @@ if __name__ == '__main__':
     print("Database: lovebite")
     print("Collection: apk_installations")
     print("WebSocket enabled for real-time camera streaming")
-    
-    # Get port from environment variable (Railway) or use default
-    port = int(os.environ.get('PORT', 5055))
-    debug = os.environ.get('FLASK_ENV') != 'production'
-    
-    print(f"🌐 Starting server on port: {port}")
-    print(f"🐛 Debug mode: {debug}")
-    
-    socketio.run(app, host='0.0.0.0', port=port, debug=debug)
+    socketio.run(app, host='0.0.0.0', port=5055, debug=True)
