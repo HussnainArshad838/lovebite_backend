@@ -1,7 +1,7 @@
 #!/bin/bash
 
-echo "💕 LoveBite APK Tracking System"
-echo "================================"
+echo "💕 LoveBite APK Tracking System - PRODUCTION MODE"
+echo "=================================================="
 echo ""
 
 # Check if we're in the right directory
@@ -26,21 +26,21 @@ echo "🔧 Activating virtual environment..."
 source venv/bin/activate
 
 # Install requirements if needed
-echo "📦 Checking requirements..."
+echo "📦 Installing production requirements..."
 pip install -r requirements.txt --quiet
 
-# Start the server
-echo "🚀 Starting LoveBite APK Tracking Server..."
+# Set production environment variables
+export FLASK_ENV=production
+export ENVIRONMENT=production
+
+# Start the server in production mode
+echo "🚀 Starting LoveBite APK Tracking Server in PRODUCTION mode..."
 echo "🌐 Server will be available at: http://localhost:5055"
 echo "📊 Admin Dashboard: http://localhost:5055/admin_dashboard.html"
 echo ""
-echo "Available modes:"
-echo "  Development: python start_server.py --mode dev"
-echo "  Production (eventlet): python start_server.py --mode prod-eventlet"
-echo "  Production (gunicorn): python start_server.py --mode prod-gunicorn"
-echo ""
+echo "Using eventlet for WebSocket support in production"
 echo "Press Ctrl+C to stop the server"
 echo ""
 
-# Default to development mode
-python start_server.py --mode dev
+# Use the production startup script
+python start_server.py --mode prod-eventlet

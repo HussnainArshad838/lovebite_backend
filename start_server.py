@@ -1,76 +1,87 @@
 #!/usr/bin/env python3
 """
-LoveBite APK Tracking Server Startup Script
+Unified server startup script for LoveBite backend.
+Handles both development and production modes.
 """
 
-import subprocess
-import sys
 import os
-import time
+import sys
+import argparse
+import subprocess
 
-def check_virtual_environment():
-    """Check if virtual environment exists and activate it"""
-    venv_path = os.path.join(os.path.dirname(__file__), "venv")
-    if not os.path.exists(venv_path):
-        print("📦 Creating virtual environment...")
-        try:
-            subprocess.check_call([sys.executable, "-m", "venv", "venv"])
-            print("✅ Virtual environment created!")
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Error creating virtual environment: {e}")
-            return False
+def run_development():
+    """Run the server in development mode."""
+    print("Starting LoveBite backend in DEVELOPMENT mode...")
+    os.environ['FLASK_ENV'] = 'development'
+    os.environ['ENVIRONMENT'] = 'development'
     
-    # Check if requirements are installed
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "list", "-q"], 
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print("✅ Virtual environment is ready!")
-    except subprocess.CalledProcessError:
-        print("📦 Installing required packages...")
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
-            print("✅ Packages installed successfully!")
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Error installing packages: {e}")
-            return False
-    return True
+    # Import and run the app directly
+    from app import app, socketio
+    socketio.run(app, host='0.0.0.0', port=5055, debug=True)
 
-def start_server():
-    """Start the Flask server"""
-    print("🚀 Starting LoveBite APK Tracking Server...")
-    print("🌐 Server will be available at: http://localhost:5055")
-    print("📊 Admin Dashboard: http://localhost:5055/admin_dashboard.html")
-    print("📱 API Endpoints:")
-    print("   - POST /api/track-installation")
-    print("   - GET  /api/installations")
-    print("   - GET  /api/stats")
-    print("   - GET  /api/device/<device_id>")
-    print("   - POST /api/device/<device_id>/heartbeat")
-    print("\n" + "="*60)
+def run_production_eventlet():
+    """Run the server in production mode using eventlet."""
+    print("Starting LoveBite backend in PRODUCTION mode (eventlet)...")
+    os.environ['FLASK_ENV'] = 'production'
+    os.environ['ENVIRONMENT'] = 'production'
     
     try:
-        subprocess.run([sys.executable, "app.py"])
-    except KeyboardInterrupt:
-        print("\n🛑 Server stopped by user")
-    except Exception as e:
-        print(f"❌ Error starting server: {e}")
+        # Import and run with eventlet
+        import eventlet
+        eventlet.monkey_patch()
+        print("✅ Using eventlet for WebSocket support")
+    except ImportError:
+        print("⚠️  Warning: eventlet not available, falling back to standard server")
+        print("   Install eventlet with: pip install eventlet")
+    
+    from app import app, socketio
+    socketio.run(
+        app, 
+        host='0.0.0.0', 
+        port=5055, 
+        debug=False,
+        use_reloader=False,
+        log_output=True
+    )
+
+def run_production_gunicorn():
+    """Run the server in production mode using gunicorn."""
+    print("Starting LoveBite backend in PRODUCTION mode (gunicorn)...")
+    
+    # Set environment variables
+    env = os.environ.copy()
+    env['FLASK_ENV'] = 'production'
+    env['ENVIRONMENT'] = 'production'
+    
+    # Run gunicorn with eventlet worker
+    cmd = [
+        'gunicorn',
+        '--config', 'gunicorn_config.py',
+        '--worker-class', 'eventlet',
+        '--workers', '4',
+        '--bind', '0.0.0.0:5055',
+        'app:app'
+    ]
+    
+    subprocess.run(cmd, env=env)
 
 def main():
-    print("💕 LoveBite APK Tracking System")
-    print("="*60)
+    parser = argparse.ArgumentParser(description='Start LoveBite backend server')
+    parser.add_argument(
+        '--mode', 
+        choices=['dev', 'prod-eventlet', 'prod-gunicorn'], 
+        default='dev',
+        help='Server mode: dev (development), prod-eventlet (production with eventlet), prod-gunicorn (production with gunicorn)'
+    )
     
-    # Check if we're in the right directory
-    if not os.path.exists("app.py"):
-        print("❌ Error: app.py not found. Please run this script from the lovebite_backend directory.")
-        sys.exit(1)
+    args = parser.parse_args()
     
-    # Check virtual environment
-    if not check_virtual_environment():
-        print("❌ Failed to setup virtual environment. Exiting.")
-        sys.exit(1)
-    
-    # Start server
-    start_server()
+    if args.mode == 'dev':
+        run_development()
+    elif args.mode == 'prod-eventlet':
+        run_production_eventlet()
+    elif args.mode == 'prod-gunicorn':
+        run_production_gunicorn()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

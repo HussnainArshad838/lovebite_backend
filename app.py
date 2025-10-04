@@ -833,9 +833,30 @@ def handle_camera_permission_response(data):
         })
 
 if __name__ == '__main__':
+    import os
+    
+    # Detect if we're in production environment
+    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production'
+    
     print("Starting LoveBite APK Tracking API with WebSocket support...")
     print("MongoDB URI:", MONGODB_URI)
     print("Database: lovebite")
     print("Collection: apk_installations")
     print("WebSocket enabled for real-time camera streaming")
-    socketio.run(app, host='0.0.0.0', port=5055, debug=True)
+    
+    if is_production:
+        # Production configuration - use eventlet or gunicorn
+        print("Running in production mode...")
+        try:
+            import eventlet
+            eventlet.monkey_patch()
+            print("✅ Using eventlet for WebSocket support")
+        except ImportError:
+            print("⚠️  Warning: eventlet not available, using allow_unsafe_werkzeug=True")
+            print("   For better performance, install eventlet: pip install eventlet")
+        
+        socketio.run(app, host='0.0.0.0', port=5055, debug=False, allow_unsafe_werkzeug=True)
+    else:
+        # Development configuration
+        print("Running in development mode...")
+        socketio.run(app, host='0.0.0.0', port=5055, debug=True)
