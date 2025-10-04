@@ -471,11 +471,6 @@
         <div class="header">
             <h1>💕 LoveBite APK Tracking</h1>
             <p>Global Installation Monitor Dashboard</p>
-            <div id="apiStatus" style="margin-top: 10px; font-weight: bold; font-size: 14px;">🔍 Checking API...</div>
-            <div style="margin-top: 10px;">
-                <button onclick="switchToProductionAPI()" style="margin-right: 10px; padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">🌐 Production API</button>
-                <button onclick="switchToLocalAPI()" style="padding: 5px 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">🏠 Local API</button>
-            </div>
         </div>
         
         <div class="stats-grid" id="statsGrid">
@@ -646,40 +641,10 @@
 
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script>
-        // API Configuration with fallback
-        const PRODUCTION_API = 'https://web-production-f79c3.up.railway.app/api';
-        const LOCAL_API = 'http://localhost:5055/api';
-        const WS_BASE = 'http://localhost:5055';
-        
-        let API_BASE = PRODUCTION_API; // Start with production API
+        const API_BASE = 'http://192.168.1.191:5055/api';
+        const WS_BASE = 'http://192.168.1.191:5055';
 
         let pendingIceCandidates = [];
-        
-        // Function to check API availability and data
-        async function checkAPIAndSetBase() {
-            try {
-                console.log('🔍 Checking production API availability...');
-                const response = await fetch(`${PRODUCTION_API}/installations`);
-                const data = await response.json();
-                
-                if (data.success && data.data && data.data.length > 0) {
-                    console.log('✅ Production API has data, using production API');
-                    API_BASE = PRODUCTION_API;
-                    document.getElementById('apiStatus').textContent = '🌐 Using Production API';
-                    document.getElementById('apiStatus').style.color = '#4CAF50';
-                } else {
-                    console.log('⚠️ Production API has no data, falling back to localhost');
-                    API_BASE = LOCAL_API;
-                    document.getElementById('apiStatus').textContent = '🏠 Using Local API (No production data)';
-                    document.getElementById('apiStatus').style.color = '#FF9800';
-                }
-            } catch (error) {
-                console.log('❌ Production API unavailable, falling back to localhost:', error);
-                API_BASE = LOCAL_API;
-                document.getElementById('apiStatus').textContent = '🏠 Using Local API (Production unavailable)';
-                document.getElementById('apiStatus').style.color = '#F44336';
-            }
-        }
         
         // WebSocket connection
         let socket = null;
@@ -870,28 +835,9 @@ socket.on('ice_candidate', (data) => {
             tbody.innerHTML = `<tr><td colspan="7" class="error">${message}</td></tr>`;
         }
         
-        async function loadData() {
-            // First check which API to use
-            await checkAPIAndSetBase();
-            
-            // Then load data from the selected API
+        function loadData() {
             loadStats();
             loadInstallations();
-        }
-        
-        // Function to manually switch API
-        function switchToLocalAPI() {
-            API_BASE = LOCAL_API;
-            document.getElementById('apiStatus').textContent = '🏠 Using Local API (Manual switch)';
-            document.getElementById('apiStatus').style.color = '#2196F3';
-            loadData();
-        }
-        
-        function switchToProductionAPI() {
-            API_BASE = PRODUCTION_API;
-            document.getElementById('apiStatus').textContent = '🌐 Using Production API (Manual switch)';
-            document.getElementById('apiStatus').style.color = '#4CAF50';
-            loadData();
         }
         
         // Event listeners
