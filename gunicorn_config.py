@@ -2,12 +2,12 @@
 import os
 
 # Server socket
-bind = "0.0.0.0:5055"
+bind = "0.0.0.0:8080"  # Changed to match your deployment port
 backlog = 2048
 
 # Worker processes
 workers = 4
-worker_class = "eventlet"
+worker_class = "sync"  # Changed from eventlet to sync for better compatibility
 worker_connections = 1000
 timeout = 30
 keepalive = 2

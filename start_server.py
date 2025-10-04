@@ -53,14 +53,14 @@ def run_production_gunicorn():
     env['FLASK_ENV'] = 'production'
     env['ENVIRONMENT'] = 'production'
     
-    # Run gunicorn with eventlet worker
+    # Run gunicorn with sync worker (better for Flask-SocketIO)
     cmd = [
         'gunicorn',
         '--config', 'gunicorn_config.py',
-        '--worker-class', 'eventlet',
+        '--worker-class', 'sync',
         '--workers', '4',
-        '--bind', '0.0.0.0:5055',
-        'app:app'
+        '--bind', '0.0.0.0:8080',
+        'main:application'  # Use main.py with application variable
     ]
     
     subprocess.run(cmd, env=env)
