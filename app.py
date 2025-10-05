@@ -91,16 +91,19 @@ def home():
         "version": "1.0.0",
         "mongodb": "connected" if mongodb_connected else "fallback",
         "timestamp": datetime.utcnow().isoformat(),
-        "port": os.getenv('PORT', '5055')
+        "port": os.getenv('PORT', '8080')
     })
 
 @app.route('/health')
 def health():
     """Simple health check endpoint for Railway"""
+    print(f"🔍 Health check request received at {datetime.utcnow()}")
     return jsonify({
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "mongodb": "connected" if mongodb_connected else "fallback"
+        "mongodb": "connected" if mongodb_connected else "fallback",
+        "port": os.getenv('PORT', '8080'),
+        "environment": os.getenv('RAILWAY_ENVIRONMENT', 'local')
     })
 
 @app.route('/api/track-installation', methods=['POST'])

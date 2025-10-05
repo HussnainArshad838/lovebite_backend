@@ -3,12 +3,14 @@ import os
 import multiprocessing
 
 # Server socket - Use Railway's dynamic PORT
-# Server socket - Use Railway's PORT environment variable
+# Server socket - Use Railway's PORT environment variable or default to 8080
 port = os.getenv('PORT', '8080')
 bind = f"0.0.0.0:{port}"
 print(f"🚀 Starting Gunicorn on port: {port}")
 print(f"🔍 Environment PORT: {os.getenv('PORT')}")
-print(f"🔍 All environment variables: {dict(os.environ)}")
+print(f"🔍 Binding to: {bind}")
+print(f"🔍 Railway environment: {os.getenv('RAILWAY_ENVIRONMENT', 'NOT SET')}")
+print(f"🔍 Railway project: {os.getenv('RAILWAY_PROJECT_ID', 'NOT SET')}")
 backlog = 2048
 
 # Worker processes - Use fewer workers for Railway's memory constraints
