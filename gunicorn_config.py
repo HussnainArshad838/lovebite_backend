@@ -2,8 +2,8 @@
 import os
 import multiprocessing
 
-# Server socket
-bind = "0.0.0.0:5055"  # Changed to match Railway's port 5055
+# Server socket - Use Railway's dynamic PORT
+bind = f"0.0.0.0:{os.getenv('PORT', '5055')}"  # Railway assigns port dynamically
 backlog = 2048
 
 # Worker processes - Use fewer workers for Railway's memory constraints
