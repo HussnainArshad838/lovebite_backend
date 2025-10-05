@@ -3,8 +3,8 @@ import os
 import multiprocessing
 
 # Server socket - Use Railway's dynamic PORT
-# Server socket - Use Railway's PORT environment variable or default to 5055 for Railway
-port = os.getenv('PORT', '5055')
+# Server socket - Use Railway's PORT environment variable or default to 8080
+port = os.getenv('PORT', '8080')
 bind = f"0.0.0.0:{port}"
 print(f"🚀 Starting Gunicorn on port: {port}")
 print(f"🔍 Environment PORT: {os.getenv('PORT')}")
@@ -12,10 +12,10 @@ print(f"🔍 Binding to: {bind}")
 print(f"🔍 Railway environment: {os.getenv('RAILWAY_ENVIRONMENT', 'NOT SET')}")
 print(f"🔍 Railway project: {os.getenv('RAILWAY_PROJECT_ID', 'NOT SET')}")
 
-# Force Railway to use port 5055 as configured in Railway settings
+# Force Railway to use port 8080
 if os.getenv('RAILWAY_ENVIRONMENT'):
-    print(f"🔧 Railway detected - using port 5055 as configured")
-    port = '5055'
+    print(f"🔧 Railway detected - using port 8080")
+    port = '8080'
     bind = f"0.0.0.0:{port}"
 backlog = 2048
 
