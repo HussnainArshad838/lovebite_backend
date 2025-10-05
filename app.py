@@ -894,7 +894,7 @@ if __name__ == '__main__':
             socketio.run(
                 app, 
                 host='0.0.0.0', 
-                port=8080,  # Use Railway's port
+                port=5055,  # Use Railway's port
                 debug=False, 
                 log_output=True,
                 use_reloader=False
@@ -906,7 +906,7 @@ if __name__ == '__main__':
             socketio.run(
                 app, 
                 host='0.0.0.0', 
-                port=8080, 
+                port=5055, 
                 debug=False, 
                 allow_unsafe_werkzeug=True,
                 use_reloader=False

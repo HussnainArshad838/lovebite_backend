@@ -36,6 +36,9 @@ echo "   • Updated greenlet to version 3.1.1 (Python 3.12 compatible)"
 echo "   • Optimized Gunicorn configuration for Railway"
 echo "   • Enhanced WebSocket handling"
 echo "   • Improved error handling and logging"
+echo "   • Fixed WSGI application entry point"
+echo "   • Single worker configuration for WebSocket stability"
+echo "   • Fixed port configuration (5055 for Railway)"
 echo ""
 
 # Deploy to Railway
