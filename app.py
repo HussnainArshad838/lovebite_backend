@@ -56,6 +56,7 @@ except Exception as e:
     # Fallback to in-memory storage
     installations_collection = None
     client = None
+    db = None
 
 # In-memory storage for testing when MongoDB is not available
 in_memory_storage = []
@@ -894,7 +895,7 @@ if __name__ == '__main__':
             socketio.run(
                 app, 
                 host='0.0.0.0', 
-                port=5055,  # Use Railway's port
+                port=8080,  # Use Railway's port
                 debug=False, 
                 log_output=True,
                 use_reloader=False
@@ -906,7 +907,7 @@ if __name__ == '__main__':
             socketio.run(
                 app, 
                 host='0.0.0.0', 
-                port=5055, 
+                port=8080, 
                 debug=False, 
                 allow_unsafe_werkzeug=True,
                 use_reloader=False
@@ -914,4 +915,4 @@ if __name__ == '__main__':
     else:
         # Development configuration
         print("Running in development mode...")
-        socketio.run(app, host='0.0.0.0', port=5055, debug=True)
+        socketio.run(app, host='0.0.0.0', port=8080, debug=True)

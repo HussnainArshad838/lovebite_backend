@@ -2,19 +2,19 @@
 import os
 import multiprocessing
 
-# Server socket - Use Railway's dynamic PORT
-bind = f"0.0.0.0:{os.getenv('PORT', '5055')}"  # Railway assigns port dynamically
+# Server socket
+bind = "0.0.0.0:5055"  # Changed to match your deployment port
 backlog = 2048
 
 # Worker processes - Use fewer workers for Railway's memory constraints
-workers = 1  # Use only 1 worker for WebSocket stability
+workers = min(2, multiprocessing.cpu_count() + 1)  # Reduced from 4 to 2
 worker_class = "eventlet"  # Use eventlet for WebSocket support
 worker_connections = 1000
 
 # Timeout settings - Increased for WebSocket operations
-timeout = 300  # Increased to 300 seconds for WebSocket operations
+timeout = 120  # Increased from 30 to 120 seconds
 keepalive = 5  # Increased from 2 to 5 seconds
-graceful_timeout = 60
+graceful_timeout = 30
 
 # Memory management
 max_requests = 500  # Reduced from 1000 to prevent memory buildup
