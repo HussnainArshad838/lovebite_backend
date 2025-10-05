@@ -3,10 +3,9 @@ import os
 import multiprocessing
 
 # Server socket - Use Railway's dynamic PORT
-# Server socket - Use Railway's PORT environment variable
-port = os.getenv('PORT', '5055')
-bind = f"0.0.0.0:{port}"
-print(f"🚀 Starting Gunicorn on port: {port}")
+# Server socket - Use Railway's configured port 5055
+bind = "0.0.0.0:5055"
+print(f"🚀 Starting Gunicorn on port: 5055")
 backlog = 2048
 
 # Worker processes - Use fewer workers for Railway's memory constraints
@@ -25,7 +24,7 @@ max_requests_jitter = 50
 preload_app = False  # Disable preloading to save memory
 
 # Memory limits
-worker_tmp_dir = "/dev/shm"  # Use shared memory for temporary files
+# worker_tmp_dir = "/dev/shm"  # Use shared memory for temporary files (Linux only)
 
 # Logging
 accesslog = "-"
