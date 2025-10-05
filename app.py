@@ -84,12 +84,14 @@ app.json_encoder = JSONEncoder
 
 @app.route('/')
 def home():
+    print(f"🔍 Health check request received at {datetime.utcnow()}")
     return jsonify({
         "message": "LoveBite APK Tracking API",
         "status": "healthy",
         "version": "1.0.0",
         "mongodb": "connected" if mongodb_connected else "fallback",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "port": os.getenv('PORT', '5055')
     })
 
 @app.route('/health')
