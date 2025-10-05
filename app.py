@@ -8,27 +8,54 @@ import os
 import time
 import uuid
 from bson import ObjectId
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+CORS(app, origins="*", supports_credentials=True)
+
+# Configure SocketIO with better production settings
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=1000000,  # 1MB buffer for WebRTC data
+    async_mode='eventlet'
+)
 
 # MongoDB connection
 MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
 
-# Initialize MongoDB connection
+# Initialize MongoDB connection with better error handling
 try:
-    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+    client = MongoClient(
+        MONGODB_URI, 
+        serverSelectionTimeoutMS=10000,  # Increased timeout
+        connectTimeoutMS=10000,
+        socketTimeoutMS=10000,
+        maxPoolSize=10,  # Limit connection pool
+        retryWrites=True,
+        retryReads=True
+    )
     # Test the connection
     client.admin.command('ping')
     db = client['lovebite']
     installations_collection = db['apk_installations']
+    logger.info("✅ Connected to MongoDB successfully!")
     print("✅ Connected to MongoDB successfully!")
 except Exception as e:
+    logger.error(f"❌ MongoDB connection failed: {e}")
     print(f"❌ MongoDB connection failed: {e}")
     print("🔄 Using in-memory storage for testing...")
     # Fallback to in-memory storage
     installations_collection = None
+    client = None
 
 # In-memory storage for testing when MongoDB is not available
 in_memory_storage = []
@@ -651,17 +678,28 @@ def update_device_permission_status(device_id):
 # WebSocket Event Handlers
 @socketio.on('connect')
 def handle_connect():
-    print(f"Client connected: {request.sid}")
-    emit('connected', {'message': 'Connected to LoveBite server'})
+    try:
+        logger.info(f"Client connected: {request.sid}")
+        print(f"Client connected: {request.sid}")
+        emit('connected', {'message': 'Connected to LoveBite server'})
+    except Exception as e:
+        logger.error(f"Error in connect handler: {e}")
+        print(f"Error in connect handler: {e}")
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print(f"Client disconnected: {request.sid}")
-    # Clean up any active streams for this client
-    for device_id, stream_info in list(active_camera_streams.items()):
-        if stream_info.get('client_id') == request.sid:
-            del active_camera_streams[device_id]
-            emit('camera_stopped', {'device_id': device_id}, room='admin_dashboard')
+    try:
+        logger.info(f"Client disconnected: {request.sid}")
+        print(f"Client disconnected: {request.sid}")
+        # Clean up any active streams for this client
+        for device_id, stream_info in list(active_camera_streams.items()):
+            if stream_info.get('client_id') == request.sid:
+                del active_camera_streams[device_id]
+                emit('camera_stopped', {'device_id': device_id}, room='admin_dashboard')
+                logger.info(f"Cleaned up camera stream for device: {device_id}")
+    except Exception as e:
+        logger.error(f"Error in disconnect handler: {e}")
+        print(f"Error in disconnect handler: {e}")
 
 @socketio.on('join_device_room')
 def handle_join_device_room(data):
@@ -845,17 +883,34 @@ if __name__ == '__main__':
     print("WebSocket enabled for real-time camera streaming")
     
     if is_production:
-        # Production configuration - use eventlet or gunicorn
+        # Production configuration - use eventlet
         print("Running in production mode...")
         try:
-            import eventlet
+            import eventlet  # type: ignore
             eventlet.monkey_patch()
             print("✅ Using eventlet for WebSocket support")
+            
+            # Run with eventlet
+            socketio.run(
+                app, 
+                host='0.0.0.0', 
+                port=8080,  # Use Railway's port
+                debug=False, 
+                log_output=True,
+                use_reloader=False
+            )
         except ImportError:
             print("⚠️  Warning: eventlet not available, using allow_unsafe_werkzeug=True")
             print("   For better performance, install eventlet: pip install eventlet")
-        
-        socketio.run(app, host='0.0.0.0', port=5055, debug=False, allow_unsafe_werkzeug=True)
+            
+            socketio.run(
+                app, 
+                host='0.0.0.0', 
+                port=8080, 
+                debug=False, 
+                allow_unsafe_werkzeug=True,
+                use_reloader=False
+            )
     else:
         # Development configuration
         print("Running in development mode...")

@@ -469,8 +469,17 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>💕 LoveBite APK Tracking</h1>
-            <p>Global Installation Monitor Dashboard</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>💕 LoveBite APK Tracking</h1>
+                    <p>Global Installation Monitor Dashboard</p>
+                </div>
+                <div>
+                    <button onclick="logout()" style="background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 10px 20px; border-radius: 25px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s ease;">
+                        🚪 Logout
+                    </button>
+                </div>
+            </div>
         </div>
         
         <div class="stats-grid" id="statsGrid">
@@ -641,6 +650,55 @@
 
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script>
+        // Authentication check
+        function checkAuthentication() {
+            const SESSION_KEY = 'lovebite_admin_session';
+            const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+            
+            const session = localStorage.getItem(SESSION_KEY);
+            if (!session) {
+                redirectToLogin();
+                return false;
+            }
+            
+            try {
+                const sessionData = JSON.parse(session);
+                const now = new Date().getTime();
+                
+                if (!sessionData.timestamp || (now - sessionData.timestamp) >= SESSION_DURATION) {
+                    // Session expired
+                    localStorage.removeItem(SESSION_KEY);
+                    redirectToLogin();
+                    return false;
+                }
+                
+                // Valid session, update timestamp
+                sessionData.timestamp = now;
+                localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+                return true;
+            } catch (error) {
+                // Invalid session data
+                localStorage.removeItem(SESSION_KEY);
+                redirectToLogin();
+                return false;
+            }
+        }
+        
+        function redirectToLogin() {
+            window.location.href = 'login.html';
+        }
+        
+        function logout() {
+            localStorage.removeItem('lovebite_admin_session');
+            redirectToLogin();
+        }
+        
+        // Check authentication on page load
+        if (!checkAuthentication()) {
+            // Stop execution if not authenticated
+            throw new Error('Authentication required');
+        }
+        
         // Dynamic URL detection for production vs development
         const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
         const API_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/api' : 'http://localhost:5055/api';
@@ -662,10 +720,15 @@
                 console.log('🔌 Connecting to WebSocket:', WS_BASE);
                 socket = io(WS_BASE, {
                     transports: ['websocket', 'polling'],
-                    timeout: 10000,
+                    timeout: 30000,  // Increased timeout
                     reconnection: true,
-                    reconnectionAttempts: 5,
-                    reconnectionDelay: 3000,
+                    reconnectionAttempts: 10,  // More attempts
+                    reconnectionDelay: 2000,   // Faster reconnection
+                    reconnectionDelayMax: 10000,  // Max delay
+                    maxReconnectionAttempts: 10,
+                    forceNew: true,  // Force new connection
+                    upgrade: true,   // Allow transport upgrades
+                    rememberUpgrade: false
                 });
 
                 socket.on('connect', () => {
@@ -763,8 +826,29 @@ socket.on('ice_candidate', (data) => {
 
                 // ICE candidate handling is already done above - removing duplicate handler
 
-                socket.on('disconnect', () => {
-                    console.log('🔌 WebSocket disconnected');
+                socket.on('disconnect', (reason) => {
+                    console.log('🔌 WebSocket disconnected:', reason);
+                    document.getElementById('cameraStatus').textContent = '🔌 WebSocket disconnected - attempting to reconnect...';
+                });
+
+                socket.on('reconnect', (attemptNumber) => {
+                    console.log('🔄 WebSocket reconnected after', attemptNumber, 'attempts');
+                    document.getElementById('cameraStatus').textContent = '✅ WebSocket reconnected';
+                });
+
+                socket.on('reconnect_error', (error) => {
+                    console.error('❌ WebSocket reconnection failed:', error);
+                    document.getElementById('cameraStatus').textContent = '❌ WebSocket reconnection failed';
+                });
+
+                socket.on('reconnect_failed', () => {
+                    console.error('❌ WebSocket reconnection failed permanently');
+                    document.getElementById('cameraStatus').textContent = '❌ WebSocket connection lost - please refresh the page';
+                });
+
+                socket.on('connect_error', (error) => {
+                    console.error('❌ WebSocket connection error:', error);
+                    document.getElementById('cameraStatus').textContent = '❌ WebSocket connection error';
                 });
 
             } catch (error) {
@@ -2302,6 +2386,38 @@ socket.on('ice_candidate', (data) => {
 
         // Auto-refresh every 30 seconds
         setInterval(loadData, 30000);
+        
+        // Check authentication every 5 minutes
+        setInterval(() => {
+            if (!checkAuthentication()) {
+                console.log('🔐 Session expired, redirecting to login');
+            }
+        }, 5 * 60 * 1000);
+        
+        // Add session warning before timeout
+        setInterval(() => {
+            const SESSION_KEY = 'lovebite_admin_session';
+            const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+            const WARNING_TIME = 30 * 60 * 1000; // 30 minutes before expiry
+            
+            const session = localStorage.getItem(SESSION_KEY);
+            if (session) {
+                try {
+                    const sessionData = JSON.parse(session);
+                    const now = new Date().getTime();
+                    const timeLeft = SESSION_DURATION - (now - sessionData.timestamp);
+                    
+                    if (timeLeft <= WARNING_TIME && timeLeft > 0) {
+                        const minutesLeft = Math.floor(timeLeft / (60 * 1000));
+                        if (minutesLeft % 30 === 0) { // Show warning every 30 minutes
+                            console.log(`⚠️ Session will expire in ${minutesLeft} minutes`);
+                        }
+                    }
+                } catch (error) {
+                    // Invalid session
+                }
+            }
+        }, 60 * 1000); // Check every minute
     </script>
 </body>
 </html>

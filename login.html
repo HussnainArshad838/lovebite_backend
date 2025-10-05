@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoveBite Admin Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #FF6B9D, #FFB3D1);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .logo {
+            margin-bottom: 30px;
+        }
+        
+        .logo h1 {
+            color: #FF6B9D;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .logo p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #FF6B9D;
+        }
+        
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #FF6B9D, #C2185B);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .loading {
+            display: none;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .security-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            text-align: left;
+        }
+        
+        .security-info h4 {
+            color: #FF6B9D;
+            margin-bottom: 10px;
+        }
+        
+        .security-info ul {
+            padding-left: 20px;
+        }
+        
+        .security-info li {
+            margin-bottom: 5px;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .password-toggle {
+            position: relative;
+        }
+        
+        .password-toggle input {
+            padding-right: 50px;
+        }
+        
+        .toggle-btn {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .toggle-btn:hover {
+            color: #FF6B9D;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>💕 LoveBite</h1>
+            <p>Admin Dashboard Login</p>
+        </div>
+        
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            
+            <div class="form-group password-toggle">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+                <button type="button" class="toggle-btn" onclick="togglePassword()">👁️</button>
+            </div>
+            
+            <button type="submit" class="login-btn" id="loginBtn">
+                🔐 Login to Dashboard
+            </button>
+            
+            <div class="loading" id="loading">
+                🔄 Authenticating...
+            </div>
+        </form>
+        
+        <div class="security-info">
+            <h4>🔒 Security Information</h4>
+            <ul>
+                <li>This is a secure admin area</li>
+                <li>Your session will expire after 24 hours</li>
+                <li>All login attempts are logged</li>
+                <li>Contact system administrator for access</li>
+            </ul>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2024 LoveBite Admin Panel. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        // Credentials
+        const ADMIN_USERNAME = 'Hussnain838';
+        const ADMIN_PASSWORD = 'HussnainSE@qsa785838';
+        
+        // Session management
+        const SESSION_KEY = 'lovebite_admin_session';
+        const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+        
+        // Check if already logged in
+        function checkExistingSession() {
+            const session = localStorage.getItem(SESSION_KEY);
+            if (session) {
+                try {
+                    const sessionData = JSON.parse(session);
+                    const now = new Date().getTime();
+                    
+                    if (sessionData.timestamp && (now - sessionData.timestamp) < SESSION_DURATION) {
+                        // Valid session, redirect to dashboard
+                        redirectToDashboard();
+                        return true;
+                    } else {
+                        // Session expired, clear it
+                        localStorage.removeItem(SESSION_KEY);
+                    }
+                } catch (error) {
+                    // Invalid session data, clear it
+                    localStorage.removeItem(SESSION_KEY);
+                }
+            }
+            return false;
+        }
+        
+        // Create session
+        function createSession() {
+            const sessionData = {
+                username: ADMIN_USERNAME,
+                timestamp: new Date().getTime(),
+                loginTime: new Date().toISOString()
+            };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+        }
+        
+        // Redirect to dashboard
+        function redirectToDashboard() {
+            window.location.href = 'admin_dashboard.html';
+        }
+        
+        // Toggle password visibility
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleBtn = document.querySelector('.toggle-btn');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.textContent = '🙈';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.textContent = '👁️';
+            }
+        }
+        
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            
+            // Hide success message if shown
+            document.getElementById('successMessage').style.display = 'none';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Show success message
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            
+            // Hide error message if shown
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+        
+        // Validate credentials
+        function validateCredentials(username, password) {
+            return username === ADMIN_USERNAME && password === ADMIN_PASSWORD;
+        }
+        
+        // Handle login form submission
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loading = document.getElementById('loading');
+            
+            // Show loading state
+            loginBtn.disabled = true;
+            loading.style.display = 'block';
+            
+            // Simulate authentication delay
+            setTimeout(() => {
+                if (validateCredentials(username, password)) {
+                    // Create session
+                    createSession();
+                    
+                    // Show success message
+                    showSuccess('✅ Login successful! Redirecting to dashboard...');
+                    
+                    // Redirect after short delay
+                    setTimeout(() => {
+                        redirectToDashboard();
+                    }, 1500);
+                } else {
+                    // Show error message
+                    showError('❌ Invalid username or password. Please try again.');
+                    
+                    // Clear form
+                    document.getElementById('password').value = '';
+                    document.getElementById('username').focus();
+                }
+                
+                // Hide loading state
+                loginBtn.disabled = false;
+                loading.style.display = 'none';
+            }, 1000);
+        });
+        
+        // Handle Enter key in password field
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+            }
+        });
+        
+        // Focus on username field on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if already logged in
+            if (checkExistingSession()) {
+                return;
+            }
+            
+            // Focus on username field
+            document.getElementById('username').focus();
+            
+            // Add some security logging
+            console.log('🔐 LoveBite Admin Login Page Loaded');
+            console.log('🔐 Session check completed');
+        });
+        
+        // Add some visual feedback
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', function() {
+                this.style.borderColor = '#FF6B9D';
+                this.style.boxShadow = '0 0 0 3px rgba(255, 107, 157, 0.1)';
+            });
+            
+            input.addEventListener('blur', function() {
+                this.style.borderColor = '#ddd';
+                this.style.boxShadow = 'none';
+            });
+        });
+        
+        // Prevent right-click and F12 (basic security)
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('keydown', function(e) {
+            // Disable F12, Ctrl+Shift+I, Ctrl+U
+            if (e.key === 'F12' || 
+                (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+                (e.ctrlKey && e.key === 'u')) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>
