@@ -693,11 +693,11 @@
             redirectToLogin();
         }
         
-        // Check authentication on page load
-        if (!checkAuthentication()) {
-            // Stop execution if not authenticated
-            throw new Error('Authentication required');
-        }
+        // Authentication check disabled for static login
+        // if (!checkAuthentication()) {
+        //     // Stop execution if not authenticated
+        //     throw new Error('Authentication required');
+        // }
         
         // Dynamic URL detection for production vs development
         const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
