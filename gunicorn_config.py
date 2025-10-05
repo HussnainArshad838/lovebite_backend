@@ -8,7 +8,7 @@ backlog = 2048
 
 # Worker processes - Use fewer workers for Railway's memory constraints
 workers = min(2, multiprocessing.cpu_count() + 1)  # Reduced from 4 to 2
-worker_class = "eventlet"  # Use eventlet for WebSocket support
+worker_class = "sync"  # Use sync worker for better compatibility
 worker_connections = 1000
 
 # Timeout settings - Increased for WebSocket operations

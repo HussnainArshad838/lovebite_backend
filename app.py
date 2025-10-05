@@ -25,8 +25,7 @@ socketio = SocketIO(
     engineio_logger=True,
     ping_timeout=60,
     ping_interval=25,
-    max_http_buffer_size=1000000,  # 1MB buffer for WebRTC data
-    async_mode='eventlet'
+    max_http_buffer_size=1000000  # 1MB buffer for WebRTC data
 )
 
 # MongoDB connection
@@ -915,4 +914,4 @@ if __name__ == '__main__':
     else:
         # Development configuration
         print("Running in development mode...")
-        socketio.run(app, host='0.0.0.0', port=8080, debug=True)
+        socketio.run(app, host='0.0.0.0', port=8080, debug=True, allow_unsafe_werkzeug=True)
