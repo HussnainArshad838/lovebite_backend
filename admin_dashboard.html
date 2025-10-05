@@ -701,8 +701,8 @@
         
         // Dynamic URL detection for production vs development
         const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        const API_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/api' : 'http://localhost:5055/api';
-        const WS_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/' : 'http://localhost:5055/';
+        const API_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/api' : 'http://localhost:8080/api';
+        const WS_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/' : 'http://localhost:8080/';
         
         console.log('🌐 Environment:', isProduction ? 'Production' : 'Development');
         console.log('🔗 API Base:', API_BASE);
