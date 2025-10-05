@@ -429,6 +429,15 @@ def admin_dashboard():
     except FileNotFoundError:
         return "Admin dashboard not found", 404
 
+@app.route('/login.html')
+def login_page():
+    """Serve the login HTML page"""
+    try:
+        with open('login.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Login page not found", 404
+
 @app.route('/api/device/<device_id>/camera', methods=['POST'])
 def control_device_camera(device_id):
     """Control camera on a specific device"""
