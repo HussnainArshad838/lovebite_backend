@@ -32,30 +32,38 @@ socketio = SocketIO(
 MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
 
 # Initialize MongoDB connection with better error handling
-try:
-    client = MongoClient(
-        MONGODB_URI, 
-        serverSelectionTimeoutMS=10000,  # Increased timeout
-        connectTimeoutMS=10000,
-        socketTimeoutMS=10000,
-        maxPoolSize=10,  # Limit connection pool
-        retryWrites=True,
-        retryReads=True
-    )
-    # Test the connection
-    client.admin.command('ping')
-    db = client['lovebite']
-    installations_collection = db['apk_installations']
-    logger.info("✅ Connected to MongoDB successfully!")
-    print("✅ Connected to MongoDB successfully!")
-except Exception as e:
-    logger.error(f"❌ MongoDB connection failed: {e}")
-    print(f"❌ MongoDB connection failed: {e}")
-    print("🔄 Using in-memory storage for testing...")
-    # Fallback to in-memory storage
-    installations_collection = None
-    client = None
-    db = None
+def init_mongodb():
+    """Initialize MongoDB connection asynchronously"""
+    global client, db, installations_collection
+    try:
+        client = MongoClient(
+            MONGODB_URI, 
+            serverSelectionTimeoutMS=5000,  # Reduced timeout for faster startup
+            connectTimeoutMS=5000,
+            socketTimeoutMS=5000,
+            maxPoolSize=5,  # Reduced pool size
+            retryWrites=True,
+            retryReads=True
+        )
+        # Test the connection
+        client.admin.command('ping')
+        db = client['lovebite']
+        installations_collection = db['apk_installations']
+        logger.info("✅ Connected to MongoDB successfully!")
+        print("✅ Connected to MongoDB successfully!")
+        return True
+    except Exception as e:
+        logger.error(f"❌ MongoDB connection failed: {e}")
+        print(f"❌ MongoDB connection failed: {e}")
+        print("🔄 Using in-memory storage for testing...")
+        # Fallback to in-memory storage
+        installations_collection = None
+        client = None
+        db = None
+        return False
+
+# Initialize MongoDB (non-blocking)
+mongodb_connected = init_mongodb()
 
 # In-memory storage for testing when MongoDB is not available
 in_memory_storage = []
@@ -78,8 +86,19 @@ app.json_encoder = JSONEncoder
 def home():
     return jsonify({
         "message": "LoveBite APK Tracking API",
-        "status": "running",
-        "version": "1.0.0"
+        "status": "healthy",
+        "version": "1.0.0",
+        "mongodb": "connected" if mongodb_connected else "fallback",
+        "timestamp": datetime.utcnow().isoformat()
+    })
+
+@app.route('/health')
+def health():
+    """Simple health check endpoint for Railway"""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "mongodb": "connected" if mongodb_connected else "fallback"
     })
 
 @app.route('/api/track-installation', methods=['POST'])
