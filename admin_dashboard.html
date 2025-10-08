@@ -701,8 +701,8 @@
         
         // Dynamic URL detection for production vs development
         const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        const API_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/api' : 'http://localhost:8080/api';
-        const WS_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/' : 'http://localhost:8080/';
+        const API_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/api' : 'http://192.168.10.19:8080/api';
+        const WS_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/' : 'http://192.168.10.19:8080/';
         
         console.log('🌐 Environment:', isProduction ? 'Production' : 'Development');
         console.log('🔗 API Base:', API_BASE);
@@ -1096,15 +1096,35 @@ socket.on('ice_candidate', (data) => {
         }
         
         async function handleWebRTCAnswer(answer) {
-    try {
-        console.log('📥 Handling WebRTC answer from device...');
-        console.log('📥 Answer type:', answer.type);
-        console.log('📥 Answer SDP length:', answer.sdp ? answer.sdp.length : 'No SDP');
-        
-        if (webrtcConnection && webrtcConnection.peerConnection) {
-            // Set remote description
-            await webrtcConnection.peerConnection.setRemoteDescription(answer);
-            console.log('✅ Remote description set');
+            try {
+                console.log('📥 Handling WebRTC answer from device...');
+                console.log('📥 Answer type:', answer.type);
+                console.log('📥 Answer SDP length:', answer.sdp ? answer.sdp.length : 'No SDP');
+                console.log('📥 Answer SDP start:', answer.sdp ? answer.sdp.substring(0, 100) + '...' : 'No SDP');
+                
+                // Validate SDP format
+                if (!answer.sdp || !answer.sdp.startsWith('v=')) {
+                    console.error('❌ Invalid SDP format - should start with "v="');
+                    console.error('❌ Received SDP:', answer.sdp);
+                    showSimulatedVideoStream();
+                    return;
+                }
+                
+                if (webrtcConnection && webrtcConnection.peerConnection) {
+                    // Check if we're in the correct state to set remote description
+                    const signalingState = webrtcConnection.peerConnection.signalingState;
+                    console.log('📥 Current signaling state:', signalingState);
+                    
+                    if (signalingState === 'have-local-offer') {
+                        // Set remote description
+                        await webrtcConnection.peerConnection.setRemoteDescription(answer);
+                        console.log('✅ Remote description set');
+                    } else {
+                        console.log('❌ Cannot set remote description in state:', signalingState);
+                        console.log('📥 Expected state: have-local-offer, got:', signalingState);
+                        showSimulatedVideoStream();
+                        return;
+                    }
             
             // Try to get remote stream
             webrtcConnection.peerConnection.ontrack = (event) => {

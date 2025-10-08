@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Test - LoveBite</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        #videoContainer {
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 WebRTC Debug Test</h1>
+        
+        <div id="status" class="status info">Initializing...</div>
+        
+        <div>
+            <h3>Device Selection</h3>
+            <select id="deviceSelect">
+                <option value="">Loading devices...</option>
+            </select>
+        </div>
+        
+        <div>
+            <h3>WebRTC Test Controls</h3>
+            <button onclick="testWebRTCConnection()">🔗 Test WebRTC Connection</button>
+            <button onclick="createTestOffer()">📤 Create Test Offer</button>
+            <button onclick="testAnswerParsing()">📥 Test Answer Parsing</button>
+            <button onclick="clearLogs()">🗑️ Clear Logs</button>
+        </div>
+        
+        <div id="videoContainer">
+            <div>WebRTC Test Area</div>
+        </div>
+        
+        <div>
+            <h3>Debug Logs</h3>
+            <div id="debugLogs"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+        const API_BASE = 'http://192.168.10.19:8080/api';
+        const WS_BASE = 'http://192.168.10.19:8080/';
+        
+        let socket = null;
+        let selectedDevice = null;
+        let isConnected = false;
+        let peerConnection = null;
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            log(`Status: ${message}`);
+        }
+        
+        function log(message, data = null) {
+            const logs = document.getElementById('debugLogs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            if (data) {
+                const dataDiv = document.createElement('pre');
+                dataDiv.textContent = JSON.stringify(data, null, 2);
+                logEntry.appendChild(dataDiv);
+            }
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('debugLogs').innerHTML = '';
+        }
+        
+        async function loadDevices() {
+            try {
+                updateStatus('Loading devices...', 'info');
+                const response = await fetch(`${API_BASE}/installations`);
+                const data = await response.json();
+                
+                if (data.success && data.data.length > 0) {
+                    const select = document.getElementById('deviceSelect');
+                    select.innerHTML = '<option value="">Select a device...</option>';
+                    
+                    data.data.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.device_id;
+                        option.textContent = `${device.device_info.brand} ${device.device_info.model} (${device.country})`;
+                        select.appendChild(option);
+                    });
+                    
+                    select.addEventListener('change', (e) => {
+                        selectedDevice = e.target.value;
+                        updateStatus(`Selected device: ${selectedDevice}`, 'success');
+                    });
+                    
+                    updateStatus(`Found ${data.data.length} devices`, 'success');
+                } else {
+                    updateStatus('No devices found', 'error');
+                }
+            } catch (error) {
+                updateStatus(`Error loading devices: ${error.message}`, 'error');
+            }
+        }
+        
+        function initializeWebSocket() {
+            try {
+                updateStatus('Connecting to WebSocket...', 'info');
+                socket = io(WS_BASE, {
+                    transports: ['websocket', 'polling'],
+                    timeout: 10000,
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 2000
+                });
+                
+                socket.on('connect', () => {
+                    updateStatus('✅ WebSocket connected', 'success');
+                    isConnected = true;
+                    socket.emit('join_admin_room');
+                });
+                
+                socket.on('joined_admin_room', (data) => {
+                    log('Joined admin room:', data);
+                });
+                
+                socket.on('camera_answer', (data) => {
+                    log('📥 Received camera answer:', data);
+                    testAnswerParsing(data.answer);
+                });
+                
+                socket.on('disconnect', () => {
+                    updateStatus('❌ WebSocket disconnected', 'error');
+                    isConnected = false;
+                });
+                
+                socket.on('connect_error', (error) => {
+                    updateStatus(`❌ WebSocket connection error: ${error.message}`, 'error');
+                });
+                
+            } catch (error) {
+                updateStatus(`❌ WebSocket initialization failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testWebRTCConnection() {
+            if (!selectedDevice) {
+                updateStatus('Please select a device first', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('Testing WebRTC connection...', 'info');
+                
+                // Create a simple peer connection for testing
+                const config = {
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                };
+                
+                peerConnection = new RTCPeerConnection(config);
+                log('✅ Peer connection created');
+                
+                // Test offer creation
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                log('✅ Test offer created:', {
+                    type: offer.type,
+                    sdpLength: offer.sdp.length,
+                    sdpStart: offer.sdp.substring(0, 100) + '...'
+                });
+                
+                updateStatus('✅ WebRTC test successful', 'success');
+                
+            } catch (error) {
+                updateStatus(`❌ WebRTC test failed: ${error.message}`, 'error');
+                log('❌ WebRTC error:', error);
+            }
+        }
+        
+        async function createTestOffer() {
+            if (!selectedDevice) {
+                updateStatus('Please select a device first', 'error');
+                return;
+            }
+            
+            if (!isConnected) {
+                updateStatus('WebSocket not connected', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('Creating test offer...', 'info');
+                
+                // Create a test offer
+                const config = {
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                };
+                
+                const testPeerConnection = new RTCPeerConnection(config);
+                const offer = await testPeerConnection.createOffer();
+                await testPeerConnection.setLocalDescription(offer);
+                
+                log('📤 Test offer created:', {
+                    type: offer.type,
+                    sdpLength: offer.sdp.length,
+                    sdpStart: offer.sdp.substring(0, 200) + '...'
+                });
+                
+                // Send test offer to device
+                const response = await fetch(`${API_BASE}/device/${selectedDevice}/camera`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'start',
+                        camera_type: 'front',
+                        offer: offer
+                    })
+                });
+                
+                const result = await response.json();
+                log('📤 Test offer sent:', result);
+                
+                updateStatus('✅ Test offer sent successfully', 'success');
+                
+            } catch (error) {
+                updateStatus(`❌ Error creating test offer: ${error.message}`, 'error');
+                log('❌ Test offer error:', error);
+            }
+        }
+        
+        function testAnswerParsing(answer = null) {
+            try {
+                if (!answer) {
+                    // Test with a malformed answer (like the one causing the error)
+                    answer = {
+                        type: 'answer',
+                        sdp: 'camera_answer_sdp_1759793895526'
+                    };
+                }
+                
+                log('📥 Testing answer parsing:', answer);
+                
+                // Try to parse the SDP
+                if (answer.sdp && answer.sdp.startsWith('v=')) {
+                    log('✅ SDP format looks correct');
+                } else {
+                    log('❌ SDP format is invalid - should start with "v="');
+                    log('❌ Current SDP start:', answer.sdp ? answer.sdp.substring(0, 50) : 'No SDP');
+                }
+                
+                // Test creating a peer connection and setting the answer
+                const config = {
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                };
+                
+                const testPeerConnection = new RTCPeerConnection(config);
+                
+                // Try to set the remote description
+                testPeerConnection.setRemoteDescription(answer)
+                    .then(() => {
+                        log('✅ Answer parsing successful');
+                        updateStatus('✅ Answer parsing test passed', 'success');
+                    })
+                    .catch((error) => {
+                        log('❌ Answer parsing failed:', error);
+                        updateStatus(`❌ Answer parsing failed: ${error.message}`, 'error');
+                    });
+                
+            } catch (error) {
+                log('❌ Answer parsing test error:', error);
+                updateStatus(`❌ Answer parsing test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeWebSocket();
+            loadDevices();
+        });
+    </script>
+</body>
+</html>

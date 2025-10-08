@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Debug - LoveBite</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 300px;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            background: #f8f9fa;
+        }
+        .log-error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .log-success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 WebRTC Debug Tool</h1>
+        
+        <div id="status" class="status info">Initializing...</div>
+        
+        <div>
+            <h3>Device Selection</h3>
+            <select id="deviceSelect">
+                <option value="">Loading devices...</option>
+            </select>
+        </div>
+        
+        <div>
+            <h3>WebRTC Debug Controls</h3>
+            <button onclick="testWebRTCFlow()">🔗 Test Complete WebRTC Flow</button>
+            <button onclick="createTestOffer()">📤 Create Test Offer</button>
+            <button onclick="testSDPParsing()">📥 Test SDP Parsing</button>
+            <button onclick="clearLogs()">🗑️ Clear Logs</button>
+        </div>
+        
+        <div>
+            <h3>Debug Logs</h3>
+            <div id="debugLogs"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+        const API_BASE = 'http://192.168.10.19:8080/api';
+        const WS_BASE = 'http://192.168.10.19:8080/';
+        
+        let socket = null;
+        let selectedDevice = null;
+        let isConnected = false;
+        let testOffer = null;
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            log(`Status: ${message}`, type);
+        }
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('debugLogs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('debugLogs').innerHTML = '';
+        }
+        
+        async function loadDevices() {
+            try {
+                updateStatus('Loading devices...', 'info');
+                const response = await fetch(`${API_BASE}/installations`);
+                const data = await response.json();
+                
+                if (data.success && data.data.length > 0) {
+                    const select = document.getElementById('deviceSelect');
+                    select.innerHTML = '<option value="">Select a device...</option>';
+                    
+                    data.data.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.device_id;
+                        option.textContent = `${device.device_info.brand} ${device.device_info.model} (${device.country})`;
+                        select.appendChild(option);
+                    });
+                    
+                    select.addEventListener('change', (e) => {
+                        selectedDevice = e.target.value;
+                        updateStatus(`Selected device: ${selectedDevice}`, 'success');
+                    });
+                    
+                    updateStatus(`Found ${data.data.length} devices`, 'success');
+                } else {
+                    updateStatus('No devices found', 'error');
+                }
+            } catch (error) {
+                updateStatus(`Error loading devices: ${error.message}`, 'error');
+            }
+        }
+        
+        function initializeWebSocket() {
+            try {
+                updateStatus('Connecting to WebSocket...', 'info');
+                socket = io(WS_BASE, {
+                    transports: ['websocket', 'polling'],
+                    timeout: 10000,
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 2000
+                });
+                
+                socket.on('connect', () => {
+                    updateStatus('✅ WebSocket connected', 'success');
+                    isConnected = true;
+                    socket.emit('join_admin_room');
+                });
+                
+                socket.on('joined_admin_room', (data) => {
+                    log('Joined admin room:', 'info');
+                });
+                
+                socket.on('camera_answer', (data) => {
+                    log('📥 Received camera answer from device:', 'info');
+                    log(`Answer type: ${data.answer?.type}`, 'info');
+                    log(`Answer SDP length: ${data.answer?.sdp?.length}`, 'info');
+                    log(`Answer SDP start: ${data.answer?.sdp?.substring(0, 100)}...`, 'info');
+                    
+                    // Test the answer
+                    testAnswer(data.answer);
+                });
+                
+                socket.on('camera_started', (data) => {
+                    log(`📹 Camera started on device: ${data.device_id}`, 'success');
+                });
+                
+                socket.on('camera_permission_response', (data) => {
+                    if (data.granted) {
+                        log('✅ Camera permission granted!', 'success');
+                    } else {
+                        log(`❌ Camera permission denied: ${data.message}`, 'error');
+                    }
+                });
+                
+                socket.on('disconnect', () => {
+                    updateStatus('❌ WebSocket disconnected', 'error');
+                    isConnected = false;
+                });
+                
+                socket.on('connect_error', (error) => {
+                    updateStatus(`❌ WebSocket connection error: ${error.message}`, 'error');
+                });
+                
+            } catch (error) {
+                updateStatus(`❌ WebSocket initialization failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testWebRTCFlow() {
+            if (!selectedDevice) {
+                updateStatus('Please select a device first', 'error');
+                return;
+            }
+            
+            if (!isConnected) {
+                updateStatus('WebSocket not connected', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('Testing complete WebRTC flow...', 'info');
+                
+                // Create a test offer
+                const config = {
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                };
+                
+                const testPeerConnection = new RTCPeerConnection(config);
+                const offer = await testPeerConnection.createOffer();
+                await testPeerConnection.setLocalDescription(offer);
+                
+                log('📤 Test offer created:', 'info');
+                log(`Offer type: ${offer.type}`, 'info');
+                log(`Offer SDP length: ${offer.sdp.length}`, 'info');
+                log(`Offer SDP start: ${offer.sdp.substring(0, 200)}...`, 'info');
+                
+                // Send test offer to device
+                const response = await fetch(`${API_BASE}/device/${selectedDevice}/camera`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'start',
+                        camera_type: 'front',
+                        offer: offer
+                    })
+                });
+                
+                const result = await response.json();
+                log('📤 Test offer sent to device:', 'info');
+                log(`Response: ${JSON.stringify(result, null, 2)}`, 'info');
+                
+                updateStatus('✅ Test offer sent - waiting for answer...', 'info');
+                
+            } catch (error) {
+                updateStatus(`❌ Error testing WebRTC flow: ${error.message}`, 'error');
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function createTestOffer() {
+            try {
+                updateStatus('Creating test offer...', 'info');
+                
+                const config = {
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                };
+                
+                const testPeerConnection = new RTCPeerConnection(config);
+                const offer = await testPeerConnection.createOffer();
+                await testPeerConnection.setLocalDescription(offer);
+                
+                testOffer = offer;
+                
+                log('📤 Test offer created:', 'success');
+                log(`Type: ${offer.type}`, 'info');
+                log(`SDP Length: ${offer.sdp.length}`, 'info');
+                log(`SDP Start: ${offer.sdp.substring(0, 100)}...`, 'info');
+                
+                updateStatus('✅ Test offer created successfully', 'success');
+                
+            } catch (error) {
+                updateStatus(`❌ Error creating test offer: ${error.message}`, 'error');
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function testSDPParsing() {
+            // Test with malformed SDP (like the one causing the error)
+            const malformedAnswer = {
+                type: 'answer',
+                sdp: 'camera_answer_sdp_1759794174729'
+            };
+            
+            log('📥 Testing malformed SDP:', 'info');
+            log(`SDP: ${malformedAnswer.sdp}`, 'info');
+            
+            if (malformedAnswer.sdp && malformedAnswer.sdp.startsWith('v=')) {
+                log('✅ SDP format is valid', 'success');
+            } else {
+                log('❌ SDP format is invalid - should start with "v="', 'error');
+            }
+            
+            // Test with valid SDP
+            const validAnswer = {
+                type: 'answer',
+                sdp: 'v=0\r\no=- 123456789 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0\r\na=msid-semantic: WMS\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=ice-ufrag:test\r\na=ice-pwd:test\r\na=fingerprint:sha-256 test\r\na=setup:active\r\na=mid:0\r\na=sendrecv\r\na=rtcp-mux\r\na=rtpmap:96 VP8/90000\r\na=ssrc:123456789 cname:test'
+            };
+            
+            log('📥 Testing valid SDP:', 'info');
+            log(`SDP: ${validAnswer.sdp.substring(0, 100)}...`, 'info');
+            
+            if (validAnswer.sdp && validAnswer.sdp.startsWith('v=')) {
+                log('✅ Valid SDP format is correct', 'success');
+            } else {
+                log('❌ Valid SDP format is invalid', 'error');
+            }
+        }
+        
+        function testAnswer(answer) {
+            log('📥 Testing received answer:', 'info');
+            
+            if (!answer) {
+                log('❌ No answer received', 'error');
+                return;
+            }
+            
+            log(`Answer type: ${answer.type}`, 'info');
+            log(`Answer SDP length: ${answer.sdp?.length || 'No SDP'}`, 'info');
+            log(`Answer SDP start: ${answer.sdp?.substring(0, 100) || 'No SDP'}...`, 'info');
+            
+            if (answer.sdp && answer.sdp.startsWith('v=')) {
+                log('✅ Answer SDP format is valid', 'success');
+                
+                // Test setting the answer
+                const config = {
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                };
+                
+                const testPeerConnection = new RTCPeerConnection(config);
+                
+                testPeerConnection.setRemoteDescription(answer)
+                    .then(() => {
+                        log('✅ Answer set successfully', 'success');
+                        updateStatus('✅ WebRTC answer test passed', 'success');
+                    })
+                    .catch((error) => {
+                        log(`❌ Failed to set answer: ${error.message}`, 'error');
+                        updateStatus(`❌ WebRTC answer test failed: ${error.message}`, 'error');
+                    });
+            } else {
+                log('❌ Answer SDP format is invalid', 'error');
+                updateStatus('❌ Received invalid SDP format', 'error');
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeWebSocket();
+            loadDevices();
+        });
+    </script>
+</body>
+</html>

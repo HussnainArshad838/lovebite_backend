@@ -438,6 +438,33 @@ def login_page():
     except FileNotFoundError:
         return "Login page not found", 404
 
+@app.route('/test_camera.html')
+def test_camera_page():
+    """Serve the camera test HTML page"""
+    try:
+        with open('test_camera.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Camera test page not found", 404
+
+@app.route('/webrtc_test.html')
+def webrtc_test_page():
+    """Serve the WebRTC test HTML page"""
+    try:
+        with open('webrtc_test.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "WebRTC test page not found", 404
+
+@app.route('/debug_webrtc.html')
+def debug_webrtc_page():
+    """Serve the WebRTC debug HTML page"""
+    try:
+        with open('debug_webrtc.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "WebRTC debug page not found", 404
+
 @app.route('/api/device/<device_id>/camera', methods=['POST'])
 def control_device_camera(device_id):
     """Control camera on a specific device"""
