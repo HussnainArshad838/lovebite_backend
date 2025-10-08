@@ -994,52 +994,26 @@ def handle_camera_permission_response(data):
         })
 
 if __name__ == '__main__':
-    import os
+    port = int(os.getenv('PORT', 8080))
     
-    # Detect if we're in production environment
-    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production'
+    print("=" * 50)
+    print("Starting LoveBite APK Tracking API")
+    print(f"Port: {port}")
+    print(f"MongoDB: {'connected' if mongodb_connected else 'fallback'}")
+    print(f"WebSocket: enabled")
+    print("=" * 50)
     
-    print("Starting LoveBite APK Tracking API with WebSocket support...")
-    print("MongoDB URI:", MONGODB_URI)
-    print("Database: lovebite")
-    print("Collection: apk_installations")
-    print("WebSocket enabled for real-time camera streaming")
+    # Start periodic memory cleanup thread
+    cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
+    cleanup_thread.start()
+    print("✅ Memory cleanup thread started")
     
-    if is_production:
-        # Production configuration - use eventlet
-        print("Running in production mode...")
-        try:
-            import eventlet  # type: ignore
-            eventlet.monkey_patch()
-            print("✅ Using eventlet for WebSocket support")
-            
-            # Start periodic memory cleanup thread
-            cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
-            cleanup_thread.start()
-            print("✅ Memory cleanup thread started")
-            
-            # Run with eventlet
-            socketio.run(
-                app, 
-                host='0.0.0.0', 
-                port=8080,  # Use Railway's port
-                debug=False, 
-                log_output=True,
-                use_reloader=False
-            )
-        except ImportError:
-            print("⚠️  Warning: eventlet not available, using allow_unsafe_werkzeug=True")
-            print("   For better performance, install eventlet: pip install eventlet")
-            
-            socketio.run(
-                app, 
-                host='0.0.0.0', 
-                port=8080, 
-                debug=False, 
-                allow_unsafe_werkzeug=True,
-                use_reloader=False
-            )
-    else:
-        # Development configuration
-        print("Running in development mode...")
-        socketio.run(app, host='0.0.0.0', port=8080, debug=True, allow_unsafe_werkzeug=True)
+    # For production with gunicorn, this block won't execute
+    # Gunicorn will handle the app startup
+    socketio.run(
+        app, 
+        host='0.0.0.0', 
+        port=port,
+        debug=False,
+        allow_unsafe_werkzeug=True
+    )

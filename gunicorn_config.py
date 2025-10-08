@@ -2,36 +2,29 @@
 import os
 import multiprocessing
 
-# Server socket - Use Railway's dynamic PORT
-# Server socket - Use Railway's PORT environment variable or default to 8080
+# Server socket - Railway provides PORT environment variable
 port = os.getenv('PORT', '8080')
 bind = f"0.0.0.0:{port}"
+
 print(f"🚀 Starting Gunicorn on port: {port}")
 print(f"🔍 Environment PORT: {os.getenv('PORT')}")
 print(f"🔍 Binding to: {bind}")
-print(f"🔍 Railway environment: {os.getenv('RAILWAY_ENVIRONMENT', 'NOT SET')}")
-print(f"🔍 Railway project: {os.getenv('RAILWAY_PROJECT_ID', 'NOT SET')}")
 
-# Force Railway to use port 8080
-if os.getenv('RAILWAY_ENVIRONMENT'):
-    print(f"🔧 Railway detected - using port 8080")
-    port = '8080'
-    bind = f"0.0.0.0:{port}"
-backlog = 2048
+backlog = 512  # Reduced for memory efficiency
 
 # Worker processes - Use only 1 worker for Railway's memory constraints
 workers = 1  # Reduced to 1 worker to prevent memory issues
 worker_class = "eventlet"  # Use eventlet for WebSocket support
 worker_connections = 1000
 
-# Timeout settings - Optimized for Railway
-timeout = 30  # Reduced back to 30 seconds
-keepalive = 2  # Reduced keepalive
+# Timeout settings - Increased for MongoDB connection time
+timeout = 120  # Increased to 120 seconds for MongoDB
+keepalive = 5  # Increased keepalive
 graceful_timeout = 30
 
-# Memory management - Aggressive settings for Railway
-max_requests = 100  # Very low to prevent memory buildup
-max_requests_jitter = 10
+# Memory management - Optimized for Railway
+max_requests = 1000  # Balanced for stability
+max_requests_jitter = 50
 preload_app = False  # Disable preloading to save memory
 
 # Memory limits
