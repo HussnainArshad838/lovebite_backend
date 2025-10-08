@@ -31,7 +31,7 @@ socketio = SocketIO(
 )
 
 # MongoDB connection
-MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
+MONGODB_URI = os.getenv('MONGODB_URI', "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb")
 
 # Initialize MongoDB connection with better error handling and memory optimization
 def init_mongodb():
@@ -1003,13 +1003,6 @@ if __name__ == '__main__':
     print(f"WebSocket: enabled")
     print("=" * 50)
     
-    # Start periodic memory cleanup thread
-    cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
-    cleanup_thread.start()
-    print("✅ Memory cleanup thread started")
-    
-    # For production with gunicorn, this block won't execute
-    # Gunicorn will handle the app startup
     socketio.run(
         app, 
         host='0.0.0.0', 
