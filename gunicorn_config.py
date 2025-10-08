@@ -1,56 +1,55 @@
 import os
-import multiprocessing
 
 # Server socket
 port = os.getenv('PORT', '8080')
 bind = f"0.0.0.0:{port}"
 
-print(f"🚀 Starting Gunicorn on port: {port}")
+print(f"🚀 Gunicorn starting on port: {port}")
 
-backlog = 512
-
-# Worker processes
+# Worker settings - MINIMAL for Railway
 workers = 1
 worker_class = "eventlet"
 worker_connections = 500
 threads = 1
+worker_tmp_dir = "/tmp"
 
 # Timeout settings
 timeout = 120
 keepalive = 5
 graceful_timeout = 30
 
-# Memory management
-max_requests = 100
+# Memory management - AGGRESSIVE
+max_requests = 50
 max_requests_jitter = 10
 preload_app = False
 
-worker_tmp_dir = "/tmp"
-
-# Logging
+# Logging - MUST BE ENABLED
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"
+capture_output = True
+enable_stdio_inheritance = True
 
 # Process naming
 proc_name = "lovebite_backend"
-
 daemon = False
-pidfile = "/tmp/lovebite_backend.pid"
 
-# Environment variables
+# Environment
 raw_env = [
     'FLASK_ENV=production',
     'ENVIRONMENT=production',
     'PYTHONUNBUFFERED=1',
-    'PYTHONDONTWRITEBYTECODE=1',
 ]
 
+# Hooks for debugging
 def when_ready(server):
-    server.log.info("Server is ready. Spawning workers")
+    server.log.info("✅ Server is ready!")
 
 def pre_fork(server, worker):
-    server.log.info("Worker spawned (pid: %s)", worker.pid)
+    server.log.info(f"🔄 Worker spawning (pid: {worker.pid})")
 
 def post_fork(server, worker):
-    server.log.info("Worker spawned (pid: %s)", worker.pid)
+    server.log.info(f"✅ Worker spawned (pid: {worker.pid})")
+
+def worker_abort(worker):
+    worker.log.error(f"❌ Worker aborted (pid: {worker.pid})")

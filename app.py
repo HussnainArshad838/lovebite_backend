@@ -19,52 +19,38 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app, origins="*", supports_credentials=True)
 
-# Configure SocketIO with optimized production settings
+# Configure SocketIO with better production settings
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*",
     logger=True,
     engineio_logger=True,
-    ping_timeout=30,  # Reduced from 60
-    ping_interval=15,  # Reduced from 25
-    max_http_buffer_size=500000  # Reduced from 1MB to 500KB
+    ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=1000000  # 1MB buffer for WebRTC data
 )
 
 # MongoDB connection
-MONGODB_URI = os.getenv('MONGODB_URI', "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb")
+MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
 
-# Initialize MongoDB connection with better error handling and memory optimization
+# Initialize MongoDB connection with better error handling
 def init_mongodb():
     """Initialize MongoDB connection asynchronously"""
     global client, db, installations_collection
     try:
         client = MongoClient(
             MONGODB_URI, 
-            serverSelectionTimeoutMS=3000,  # Reduced timeout
-            connectTimeoutMS=3000,
-            socketTimeoutMS=3000,
-            maxPoolSize=2,  # Very small pool size
-            minPoolSize=1,
-            maxIdleTimeMS=30000,  # Close idle connections quickly
+            serverSelectionTimeoutMS=5000,  # Reduced timeout for faster startup
+            connectTimeoutMS=5000,
+            socketTimeoutMS=5000,
+            maxPoolSize=5,  # Reduced pool size
             retryWrites=True,
-            retryReads=True,
-            compressors=['zlib'],  # Enable compression
-            zlibCompressionLevel=6
+            retryReads=True
         )
         # Test the connection
         client.admin.command('ping')
         db = client['lovebite']
         installations_collection = db['apk_installations']
-        
-        # Create indexes for better performance
-        try:
-            installations_collection.create_index("device_id", unique=True)
-            installations_collection.create_index("last_seen")
-            installations_collection.create_index("is_active")
-            print("✅ Database indexes created successfully")
-        except Exception as e:
-            print(f"⚠️  Warning: Could not create indexes: {e}")
-        
         logger.info("✅ Connected to MongoDB successfully!")
         print("✅ Connected to MongoDB successfully!")
         return True
@@ -89,53 +75,6 @@ webrtc_offers = {}
 webrtc_answers = {}
 active_camera_streams = {}
 ice_candidates = {}
-
-# Memory cleanup function
-def cleanup_memory():
-    """Clean up memory and close idle connections"""
-    try:
-        # Force garbage collection
-        gc.collect()
-        
-        # Log memory usage
-        try:
-            import psutil
-            process = psutil.Process(os.getpid())
-            memory_mb = process.memory_info().rss / 1024 / 1024
-            print(f"🧹 Memory cleanup - Current usage: {memory_mb:.2f} MB")
-        except ImportError:
-            print("🧹 Memory cleanup - psutil not available")
-        
-        # Clean up old WebRTC data (older than 1 hour)
-        current_time = time.time()
-        expired_offers = [offer_id for offer_id, offer in webrtc_offers.items() 
-                         if current_time - offer.get('timestamp', 0) > 3600]
-        for offer_id in expired_offers:
-            del webrtc_offers[offer_id]
-        
-        expired_answers = [answer_id for answer_id, answer in webrtc_answers.items() 
-                          if current_time - answer.get('timestamp', 0) > 3600]
-        for answer_id in expired_answers:
-            del webrtc_answers[answer_id]
-        
-        # Clean up inactive camera streams
-        inactive_streams = [device_id for device_id, stream in active_camera_streams.items() 
-                           if current_time - stream.get('started_at', 0) > 3600]
-        for device_id in inactive_streams:
-            del active_camera_streams[device_id]
-        
-        if expired_offers or expired_answers or inactive_streams:
-            print(f"🧹 Cleaned up {len(expired_offers)} offers, {len(expired_answers)} answers, {len(inactive_streams)} streams")
-            
-    except Exception as e:
-        print(f"Error in memory cleanup: {e}")
-
-# Periodic cleanup thread
-def periodic_cleanup():
-    """Run memory cleanup every 5 minutes"""
-    while True:
-        time.sleep(300)  # 5 minutes
-        cleanup_memory()
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -994,19 +933,47 @@ def handle_camera_permission_response(data):
         })
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 8080))
+    import os
     
-    print("=" * 50)
-    print("Starting LoveBite APK Tracking API")
-    print(f"Port: {port}")
-    print(f"MongoDB: {'connected' if mongodb_connected else 'fallback'}")
-    print(f"WebSocket: enabled")
-    print("=" * 50)
+    # Detect if we're in production environment
+    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production'
     
-    socketio.run(
-        app, 
-        host='0.0.0.0', 
-        port=port,
-        debug=False,
-        allow_unsafe_werkzeug=True
-    )
+    print("Starting LoveBite APK Tracking API with WebSocket support...")
+    print("MongoDB URI:", MONGODB_URI)
+    print("Database: lovebite")
+    print("Collection: apk_installations")
+    print("WebSocket enabled for real-time camera streaming")
+    
+    if is_production:
+        # Production configuration - use eventlet
+        print("Running in production mode...")
+        try:
+            import eventlet  # type: ignore
+            eventlet.monkey_patch()
+            print("✅ Using eventlet for WebSocket support")
+            
+            # Run with eventlet
+            socketio.run(
+                app, 
+                host='0.0.0.0', 
+                port=8080,  # Use Railway's port
+                debug=False, 
+                log_output=True,
+                use_reloader=False
+            )
+        except ImportError:
+            print("⚠️  Warning: eventlet not available, using allow_unsafe_werkzeug=True")
+            print("   For better performance, install eventlet: pip install eventlet")
+            
+            socketio.run(
+                app, 
+                host='0.0.0.0', 
+                port=8080, 
+                debug=False, 
+                allow_unsafe_werkzeug=True,
+                use_reloader=False
+            )
+    else:
+        # Development configuration
+        print("Running in development mode...")
+        socketio.run(app, host='0.0.0.0', port=8080, debug=True, allow_unsafe_werkzeug=True)

@@ -11,4 +11,4 @@ cmds = [
 cmds = ["echo 'Build completed'"]
 
 [start]
-cmd = "gunicorn --bind 0.0.0.0:$PORT --worker-class eventlet --workers 1 --timeout 120 --log-level info app:app"
+cmd = ". /opt/venv/bin/activate && gunicorn --bind 0.0.0.0:$PORT --worker-class eventlet --workers 1 --timeout 120 --log-level info --access-logfile - --error-logfile - app:app"
