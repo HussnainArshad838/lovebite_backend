@@ -19,23 +19,23 @@ if os.getenv('RAILWAY_ENVIRONMENT'):
     bind = f"0.0.0.0:{port}"
 backlog = 2048
 
-# Worker processes - Use fewer workers for Railway's memory constraints
-workers = min(2, multiprocessing.cpu_count() + 1)  # Reduced from 4 to 2
-worker_class = "sync"  # Use sync worker for better compatibility
+# Worker processes - Use only 1 worker for Railway's memory constraints
+workers = 1  # Reduced to 1 worker to prevent memory issues
+worker_class = "eventlet"  # Use eventlet for WebSocket support
 worker_connections = 1000
 
-# Timeout settings - Increased for WebSocket operations
-timeout = 120  # Increased from 30 to 120 seconds
-keepalive = 5  # Increased from 2 to 5 seconds
+# Timeout settings - Optimized for Railway
+timeout = 30  # Reduced back to 30 seconds
+keepalive = 2  # Reduced keepalive
 graceful_timeout = 30
 
-# Memory management
-max_requests = 500  # Reduced from 1000 to prevent memory buildup
-max_requests_jitter = 50
+# Memory management - Aggressive settings for Railway
+max_requests = 100  # Very low to prevent memory buildup
+max_requests_jitter = 10
 preload_app = False  # Disable preloading to save memory
 
 # Memory limits
-# worker_tmp_dir = "/dev/shm"  # Use shared memory for temporary files (Linux only)
+worker_tmp_dir = "/tmp"  # Use /tmp for temporary files
 
 # Logging
 accesslog = "-"
@@ -61,7 +61,8 @@ tmp_upload_dir = None
 raw_env = [
     'FLASK_ENV=production',
     'ENVIRONMENT=production',
-    'PYTHONUNBUFFERED=1',  # Ensure output is sent to terminal
+    'PYTHONUNBUFFERED=1',
+    'PYTHONDONTWRITEBYTECODE=1',  # Prevent .pyc files
 ]
 
 # Eventlet specific settings

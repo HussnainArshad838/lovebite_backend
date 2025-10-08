@@ -9,6 +9,8 @@ import time
 import uuid
 from bson import ObjectId
 import logging
+import gc
+import threading
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,38 +19,52 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app, origins="*", supports_credentials=True)
 
-# Configure SocketIO with better production settings
+# Configure SocketIO with optimized production settings
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*",
     logger=True,
     engineio_logger=True,
-    ping_timeout=60,
-    ping_interval=25,
-    max_http_buffer_size=1000000  # 1MB buffer for WebRTC data
+    ping_timeout=30,  # Reduced from 60
+    ping_interval=15,  # Reduced from 25
+    max_http_buffer_size=500000  # Reduced from 1MB to 500KB
 )
 
 # MongoDB connection
 MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
 
-# Initialize MongoDB connection with better error handling
+# Initialize MongoDB connection with better error handling and memory optimization
 def init_mongodb():
     """Initialize MongoDB connection asynchronously"""
     global client, db, installations_collection
     try:
         client = MongoClient(
             MONGODB_URI, 
-            serverSelectionTimeoutMS=5000,  # Reduced timeout for faster startup
-            connectTimeoutMS=5000,
-            socketTimeoutMS=5000,
-            maxPoolSize=5,  # Reduced pool size
+            serverSelectionTimeoutMS=3000,  # Reduced timeout
+            connectTimeoutMS=3000,
+            socketTimeoutMS=3000,
+            maxPoolSize=2,  # Very small pool size
+            minPoolSize=1,
+            maxIdleTimeMS=30000,  # Close idle connections quickly
             retryWrites=True,
-            retryReads=True
+            retryReads=True,
+            compressors=['zlib'],  # Enable compression
+            zlibCompressionLevel=6
         )
         # Test the connection
         client.admin.command('ping')
         db = client['lovebite']
         installations_collection = db['apk_installations']
+        
+        # Create indexes for better performance
+        try:
+            installations_collection.create_index("device_id", unique=True)
+            installations_collection.create_index("last_seen")
+            installations_collection.create_index("is_active")
+            print("✅ Database indexes created successfully")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not create indexes: {e}")
+        
         logger.info("✅ Connected to MongoDB successfully!")
         print("✅ Connected to MongoDB successfully!")
         return True
@@ -73,6 +89,53 @@ webrtc_offers = {}
 webrtc_answers = {}
 active_camera_streams = {}
 ice_candidates = {}
+
+# Memory cleanup function
+def cleanup_memory():
+    """Clean up memory and close idle connections"""
+    try:
+        # Force garbage collection
+        gc.collect()
+        
+        # Log memory usage
+        try:
+            import psutil
+            process = psutil.Process(os.getpid())
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            print(f"🧹 Memory cleanup - Current usage: {memory_mb:.2f} MB")
+        except ImportError:
+            print("🧹 Memory cleanup - psutil not available")
+        
+        # Clean up old WebRTC data (older than 1 hour)
+        current_time = time.time()
+        expired_offers = [offer_id for offer_id, offer in webrtc_offers.items() 
+                         if current_time - offer.get('timestamp', 0) > 3600]
+        for offer_id in expired_offers:
+            del webrtc_offers[offer_id]
+        
+        expired_answers = [answer_id for answer_id, answer in webrtc_answers.items() 
+                          if current_time - answer.get('timestamp', 0) > 3600]
+        for answer_id in expired_answers:
+            del webrtc_answers[answer_id]
+        
+        # Clean up inactive camera streams
+        inactive_streams = [device_id for device_id, stream in active_camera_streams.items() 
+                           if current_time - stream.get('started_at', 0) > 3600]
+        for device_id in inactive_streams:
+            del active_camera_streams[device_id]
+        
+        if expired_offers or expired_answers or inactive_streams:
+            print(f"🧹 Cleaned up {len(expired_offers)} offers, {len(expired_answers)} answers, {len(inactive_streams)} streams")
+            
+    except Exception as e:
+        print(f"Error in memory cleanup: {e}")
+
+# Periodic cleanup thread
+def periodic_cleanup():
+    """Run memory cleanup every 5 minutes"""
+    while True:
+        time.sleep(300)  # 5 minutes
+        cleanup_memory()
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -949,6 +1012,11 @@ if __name__ == '__main__':
             import eventlet  # type: ignore
             eventlet.monkey_patch()
             print("✅ Using eventlet for WebSocket support")
+            
+            # Start periodic memory cleanup thread
+            cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
+            cleanup_thread.start()
+            print("✅ Memory cleanup thread started")
             
             # Run with eventlet
             socketio.run(
