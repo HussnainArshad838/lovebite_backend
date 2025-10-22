@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ],
+  "env": {
+    "FLASK_ENV": "production",
+    "VERCEL": "1"
+  },
+  "functions": {
+    "app.py": {
+      "maxDuration": 30
+    }
+  },
+  "installCommand": "pip install -r requirements-vercel.txt"
+}
