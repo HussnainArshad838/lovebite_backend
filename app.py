@@ -86,10 +86,15 @@ def init_mongodb_async():
         print("🔄 Using in-memory storage for testing...")
         mongodb_connected = False
 
-# Start MongoDB connection based on environment
+# Initialize MongoDB connection
+# Delay initialization on first request for Vercel to avoid cold start issues
 if IS_VERCEL:
-    # On Vercel, initialize synchronously (serverless functions need quick startup)
-    init_mongodb_async()
+    # On Vercel, initialize on first request
+    @app.before_first_request
+    def init_on_first_request():
+        global mongodb_connected
+        if not mongodb_connected:
+            init_mongodb_async()
 else:
     # On other platforms, use background thread - DON'T BLOCK STARTUP
     mongodb_thread = threading.Thread(target=init_mongodb_async, daemon=True)
@@ -298,10 +303,6 @@ if socketio:
         join_room('admin_dashboard')
         print(f"Admin client connected: {request.sid}")
         emit('joined_admin_room', {'message': 'Joined admin dashboard'})
-
-# Vercel serverless handler - export the app directly
-# Vercel will automatically wrap it
-handler = app
 
 if __name__ == '__main__':
     print("🚀 Starting LoveBite APK Tracking API...")

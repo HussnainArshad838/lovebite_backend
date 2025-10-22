@@ -1,19 +1,24 @@
 """
 Vercel serverless entry point
-This file imports the Flask app and exports it for Vercel
 """
-import sys
 import os
+import sys
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Set Vercel environment
+# Set environment before imports
 os.environ['VERCEL'] = '1'
 os.environ['FLASK_ENV'] = 'production'
+os.environ['VERCEL_HANDLER_INSPECTION'] = '0'
 
-# Import the Flask app
-from app import app
+# Add parent directory to Python path
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-# Export for Vercel
-handler = app
+# Import Flask app
+from app import app as application
+
+# Vercel expects the WSGI app to be available at module level
+# This is the entry point for serverless function
+def handler(environ, start_response):
+    """Vercel serverless handler"""
+    return application(environ, start_response)
