@@ -20,7 +20,13 @@ CORS(app, origins="*", supports_credentials=True)
 # Check if we're running on Vercel (serverless environment)
 IS_VERCEL = os.getenv('VERCEL') == '1'
 
-# Only import SocketIO if not on Vercel
+# Initialize socketio and related functions as None by default
+socketio = None
+emit = None
+join_room = None
+leave_room = None
+
+# Only import and configure SocketIO if not on Vercel
 if not IS_VERCEL:
     try:
         from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -35,11 +41,7 @@ if not IS_VERCEL:
             max_http_buffer_size=1000000  # 1MB buffer for WebRTC data
         )
     except ImportError:
-        socketio = None
-        print("⚠️  Flask-SocketIO not available, WebSocket features disabled")
-else:
-    socketio = None
-    print("🔧 Running on Vercel - WebSocket features disabled")
+        pass  # SocketIO not available, websocket features disabled
 
 # MongoDB connection
 MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
