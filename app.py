@@ -148,6 +148,24 @@ def detailed_status():
         "timestamp": datetime.utcnow().isoformat()
     })
 
+@app.route('/admin_dashboard.html')
+def admin_dashboard():
+    """Serve the admin dashboard HTML page"""
+    try:
+        with open('admin_dashboard.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Admin dashboard not found", 404
+
+@app.route('/login.html')
+def login_page():
+    """Serve the login HTML page"""
+    try:
+        with open('login.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Login page not found", 404
+
 @app.route('/api/track-installation', methods=['POST'])
 def track_installation():
     try:
@@ -328,7 +346,7 @@ if __name__ == '__main__':
             app, 
             host='0.0.0.0', 
             port=int(os.getenv('PORT', '8080')),
-            debug=False,
+            debug=False, 
             allow_unsafe_werkzeug=True
         )
     else:
