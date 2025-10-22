@@ -87,14 +87,22 @@ def init_mongodb_async():
         mongodb_connected = False
 
 # Initialize MongoDB connection
-# Delay initialization on first request for Vercel to avoid cold start issues
-if IS_VERCEL:
-    # On Vercel, initialize on first request
-    @app.before_first_request
-    def init_on_first_request():
-        global mongodb_connected
+# Use lazy initialization for Vercel to avoid cold start issues
+_mongodb_initialized = False
+
+def ensure_mongodb_connection():
+    """Ensure MongoDB is connected (lazy initialization for Vercel)"""
+    global _mongodb_initialized, mongodb_connected
+    if not _mongodb_initialized:
+        _mongodb_initialized = True
         if not mongodb_connected:
             init_mongodb_async()
+
+if IS_VERCEL:
+    # On Vercel, initialize lazily on first actual request
+    @app.before_request
+    def init_mongodb_before_request():
+        ensure_mongodb_connection()
 else:
     # On other platforms, use background thread - DON'T BLOCK STARTUP
     mongodb_thread = threading.Thread(target=init_mongodb_async, daemon=True)
