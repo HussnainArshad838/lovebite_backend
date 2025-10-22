@@ -86,9 +86,14 @@ def init_mongodb_async():
         print("🔄 Using in-memory storage for testing...")
         mongodb_connected = False
 
-# Start MongoDB connection in background thread - DON'T BLOCK STARTUP
-mongodb_thread = threading.Thread(target=init_mongodb_async, daemon=True)
-mongodb_thread.start()
+# Start MongoDB connection based on environment
+if IS_VERCEL:
+    # On Vercel, initialize synchronously (serverless functions need quick startup)
+    init_mongodb_async()
+else:
+    # On other platforms, use background thread - DON'T BLOCK STARTUP
+    mongodb_thread = threading.Thread(target=init_mongodb_async, daemon=True)
+    mongodb_thread.start()
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -294,9 +299,9 @@ if socketio:
         print(f"Admin client connected: {request.sid}")
         emit('joined_admin_room', {'message': 'Joined admin dashboard'})
 
-# Vercel handler
-def handler(request):
-    return app(request.environ, lambda *args: None)
+# Vercel serverless handler - export the app directly
+# Vercel will automatically wrap it
+handler = app
 
 if __name__ == '__main__':
     print("🚀 Starting LoveBite APK Tracking API...")

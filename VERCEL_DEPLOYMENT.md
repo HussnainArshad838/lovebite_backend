@@ -7,20 +7,30 @@ This Flask application has been configured to work with Vercel's serverless envi
 
 ### 1. `vercel.json`
 - Main Vercel configuration file
-- Routes all requests to `app.py`
+- Routes all requests to `api/index.py`
 - Sets environment variables
 - Configures Python runtime
 
-### 2. `requirements-vercel.txt`
-- Lightweight requirements file for Vercel
+### 2. `requirements.txt` (Swapped for Vercel)
+- Lightweight requirements file for Vercel deployment
 - Excludes WebSocket dependencies (Flask-SocketIO, eventlet)
 - Only includes essential packages
+- Original requirements saved as `requirements-full.txt`
 
-### 3. `app.py` (Modified)
+### 3. `api/index.py`
+- Vercel serverless entry point
+- Sets Vercel environment variables
+- Imports and exports the Flask app
+
+### 4. `app.py` (Modified)
 - Added Vercel detection (`IS_VERCEL` environment variable)
 - Conditionally imports SocketIO only when not on Vercel
 - WebSocket handlers are wrapped in `if socketio:` blocks
-- Added Vercel handler function
+- Synchronous MongoDB initialization on Vercel
+
+### 5. `.vercelignore`
+- Excludes unnecessary files from Vercel deployment
+- Reduces deployment size and time
 
 ## Deployment Steps
 
@@ -112,3 +122,29 @@ vercel dev
 ```
 
 This will simulate the Vercel environment locally.
+
+## Switching Back to Full Requirements
+
+If you need to deploy to Railway or run locally with WebSocket support:
+
+```bash
+# Restore full requirements
+mv requirements.txt requirements-vercel.txt
+mv requirements-full.txt requirements.txt
+
+# Now you can run with full features
+python app.py
+```
+
+## Switching to Vercel Requirements
+
+To prepare for Vercel deployment:
+
+```bash
+# Use lightweight requirements
+mv requirements.txt requirements-full.txt
+mv requirements-vercel.txt requirements.txt
+
+# Deploy to Vercel
+vercel
+```
