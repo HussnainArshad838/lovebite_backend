@@ -701,8 +701,9 @@
         
         // Dynamic URL detection for production vs development
         const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        const API_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/api' : 'http://192.168.10.19:8080/api';
-        const WS_BASE = isProduction ? 'https://lovebitebackend-production-1f4e.up.railway.app/' : 'http://192.168.10.19:8080/';
+        // Use Vercel deployment URL (WebSocket not available on Vercel serverless)
+        const API_BASE = isProduction ? 'https://lovebite-backend.vercel.app/api' : 'http://localhost:8080/api';
+        const WS_BASE = isProduction ? null : 'http://localhost:8080/'; // WebSocket only in local dev
         
         console.log('🌐 Environment:', isProduction ? 'Production' : 'Development');
         console.log('🔗 API Base:', API_BASE);
@@ -716,6 +717,12 @@
 
         // Initialize WebSocket connection
         function initializeWebSocket() {
+            // Skip WebSocket in production (Vercel doesn't support WebSockets)
+            if (!WS_BASE || WS_BASE === null) {
+                console.log('⚠️ WebSocket disabled in production (Vercel serverless)');
+                return;
+            }
+            
             try {
                 console.log('🔌 Connecting to WebSocket:', WS_BASE);
                 socket = io(WS_BASE, {
