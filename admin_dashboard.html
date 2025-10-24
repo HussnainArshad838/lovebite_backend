@@ -464,13 +464,148 @@
             margin: 10px 0;
             text-align: center;
         }
+
+        /* Authentication Styles */
+        .auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #FF6B9D, #FFB3D1);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .auth-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .auth-box h2 {
+            color: #FF6B9D;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .auth-box p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .auth-input:focus {
+            outline: none;
+            border-color: #FF6B9D;
+        }
+
+        .auth-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #FF6B9D, #C2185B);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .auth-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255, 107, 157, 0.4);
+        }
+
+        .auth-error {
+            color: #dc3545;
+            margin-top: 15px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .auth-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        .dashboard-content {
+            display: none;
+        }
+
+        .dashboard-content.authenticated {
+            display: block;
+        }
     </style>
 </head>
 <body>
+    <!-- Authentication Overlay -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-box">
+            <div class="auth-icon">💕</div>
+            <h2>LoveBite Dashboard</h2>
+            <p>Please enter credentials to access the admin panel</p>
+            <form id="authForm" onsubmit="return authenticate(event)">
+                <input 
+                    type="text" 
+                    id="username" 
+                    class="auth-input" 
+                    placeholder="Username"
+                    autocomplete="username"
+                    required
+                >
+                <input 
+                    type="password" 
+                    id="password" 
+                    class="auth-input" 
+                    placeholder="Password"
+                    autocomplete="current-password"
+                    required
+                >
+                <button type="submit" class="auth-btn">🔓 Login</button>
+            </form>
+            <div class="auth-error" id="authError">❌ Invalid username or password</div>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div class="dashboard-content" id="dashboardContent">
     <div class="container">
-        <div class="header">
+        <div class="header" style="position: relative;">
             <h1>💕 LoveBite APK Tracking</h1>
             <p>Global Installation Monitor Dashboard</p>
+            <button onclick="logout()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.5); padding: 10px 20px; border-radius: 25px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                🚪 Logout
+            </button>
         </div>
         
         <div class="stats-grid" id="statsGrid">
@@ -638,9 +773,126 @@
             </div>
         </div>
     </div>
+    </div>
+    <!-- End Dashboard Content -->
 
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script>
+        // Authentication Function
+        function authenticate(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const authError = document.getElementById('authError');
+            
+            // Credentials
+            const VALID_USERNAME = 'HussnainArshad838';
+            const VALID_PASSWORD = 'HussnainSE@qsa785838';
+            
+            if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+                // Successful login
+                console.log('✅ Authentication successful');
+                
+                // Store auth session (24 hours)
+                const expiryTime = Date.now() + (24 * 60 * 60 * 1000);
+                sessionStorage.setItem('lovebite_auth', btoa(username + ':' + password));
+                sessionStorage.setItem('lovebite_auth_expiry', expiryTime);
+                
+                // Hide auth overlay and show dashboard
+                document.getElementById('authOverlay').style.display = 'none';
+                document.getElementById('dashboardContent').classList.add('authenticated');
+                
+                // Initialize dashboard
+                initializeDashboard();
+                
+                return false;
+            } else {
+                // Failed login
+                console.log('❌ Authentication failed');
+                authError.style.display = 'block';
+                
+                // Shake animation
+                const authBox = document.querySelector('.auth-box');
+                authBox.style.animation = 'shake 0.5s';
+                setTimeout(() => {
+                    authBox.style.animation = 'slideIn 0.5s ease-out';
+                }, 500);
+                
+                // Clear password field
+                document.getElementById('password').value = '';
+                
+                return false;
+            }
+        }
+        
+        // Check authentication on page load
+        function checkAuth() {
+            const auth = sessionStorage.getItem('lovebite_auth');
+            const expiry = sessionStorage.getItem('lovebite_auth_expiry');
+            
+            if (auth && expiry) {
+                const currentTime = Date.now();
+                if (currentTime < parseInt(expiry)) {
+                    // Valid session
+                    try {
+                        const decoded = atob(auth);
+                        const [username, password] = decoded.split(':');
+                        
+                        if (username === 'Hussnain' && password === '123') {
+                            console.log('✅ Existing session valid');
+                            document.getElementById('authOverlay').style.display = 'none';
+                            document.getElementById('dashboardContent').classList.add('authenticated');
+                            initializeDashboard();
+                            return;
+                        }
+                    } catch (e) {
+                        console.log('❌ Invalid session data');
+                    }
+                }
+            }
+            
+            // No valid session - show login
+            console.log('🔐 Authentication required');
+        }
+        
+        // Initialize dashboard after authentication
+        function initializeDashboard() {
+            // Original initialization code will run here
+            loadData();
+            initializeWebSocket();
+            loadDevices();
+            checkUrlStatus();
+        }
+        
+        // Logout function
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                console.log('🚪 Logging out...');
+                
+                // Clear session
+                sessionStorage.removeItem('lovebite_auth');
+                sessionStorage.removeItem('lovebite_auth_expiry');
+                
+                // Reload page to show login
+                window.location.reload();
+            }
+        }
+        
+        // Add shake animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+                20%, 40%, 60%, 80% { transform: translateX(10px); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Check auth on page load
+        checkAuth();
+
         // Configuration - Change ENVIRONMENT in config below to switch between local and production
         const ENVIRONMENT = 'development';  // Options: 'development' or 'production'
         
@@ -857,7 +1109,8 @@ socket.on('ice_candidate', (data) => {
         document.getElementById('activeFilter').addEventListener('change', loadInstallations);
         
         // Load data on page load
-        loadData();
+        // NOTE: loadData() is now called from initializeDashboard() after authentication
+        // loadData();
         
         // Camera Control Functions
         let currentStream = null;
@@ -2314,10 +2567,10 @@ socket.on('ice_candidate', (data) => {
         }
 
         // Initialize device list on page load
+        // NOTE: Initialization moved to initializeDashboard() function after authentication
         document.addEventListener('DOMContentLoaded', () => {
-            initializeWebSocket(); // Initialize WebSocket
-            loadDevices();
-            checkUrlStatus(); // Check URL and HTTPS status
+            // Only check auth on page load, don't initialize dashboard yet
+            checkAuth();
         });
 
         // Check URL and HTTPS status
