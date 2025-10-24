@@ -518,7 +518,7 @@
                 </button>
             </div>
             <div class="video-container">
-                <video id="cameraVideo" autoplay muted playsinline></video>
+                <video id="cameraVideo" autoplay playsinline></video>
             </div>
             <div class="camera-status" id="cameraStatus">
                 Click a camera button to start video
@@ -970,17 +970,30 @@ socket.on('ice_candidate', (data) => {
                 
                 // Handle remote stream
                 peerConnection.ontrack = (event) => {
-                    console.log('📹 Remote stream received from device');
+                    console.log('📹 Remote track received:', event.track.kind);
+                    console.log('📹 Track enabled:', event.track.enabled);
+                    console.log('📹 Stream tracks:', event.streams[0].getTracks().map(t => ({ kind: t.kind, enabled: t.enabled })));
+                    
                     const video = document.getElementById('cameraVideo');
                     video.srcObject = event.streams[0];
+                    video.muted = false;  // Ensure audio is not muted
                     video.play();
                     
                     // Store remote stream
                     webrtcConnection.remoteStream = event.streams[0];
                     
+                    // Check for audio tracks
+                    const audioTracks = event.streams[0].getAudioTracks();
+                    console.log('🎤 Audio tracks received:', audioTracks.length);
+                    if (audioTracks.length > 0) {
+                        console.log('✅ Audio track available:', audioTracks[0].label);
+                    } else {
+                        console.warn('⚠️ No audio tracks in stream');
+                    }
+                    
                     // Update status
                     document.getElementById('cameraStatus').textContent = 
-                        `📹 Live video stream from device: ${selectedDevice}`;
+                        `📹 Live ${audioTracks.length > 0 ? 'video + audio' : 'video'} stream from device: ${selectedDevice}`;
                 };
                 
                 // Handle connection state changes
@@ -1012,7 +1025,7 @@ socket.on('ice_candidate', (data) => {
                 
                 const offer = await webrtcConnection.peerConnection.createOffer({
                     offerToReceiveVideo: true,
-                    offerToReceiveAudio: false
+                    offerToReceiveAudio: true  // Enable audio reception from mobile device
                 });
                 
                 await webrtcConnection.peerConnection.setLocalDescription(offer);
@@ -1048,13 +1061,19 @@ socket.on('ice_candidate', (data) => {
             
             // Try to get remote stream
             webrtcConnection.peerConnection.ontrack = (event) => {
-                console.log('📹 Remote track received:', event.track.kind);
+                console.log('📹 Remote track received (answer handler):', event.track.kind);
+                console.log('📹 Track enabled:', event.track.enabled);
                 if (event.streams && event.streams[0]) {
                     webrtcConnection.remoteStream = event.streams[0];
-                            console.log('✅ Remote stream set');
-                            showRealVideoStream();
-                        }
-                    };
+                    console.log('✅ Remote stream set');
+                    
+                    // Check for audio tracks
+                    const audioTracks = event.streams[0].getAudioTracks();
+                    console.log('🎤 Audio tracks in answer handler:', audioTracks.length);
+                    
+                    showRealVideoStream();
+                }
+            };
                     
                     // Wait a bit for stream to be established
                     setTimeout(() => {
@@ -1353,8 +1372,8 @@ socket.on('ice_candidate', (data) => {
             
             video.innerHTML = `
                 <div style="position: relative; width: 100%; height: 100%; background: #000; border-radius: 10px; overflow: hidden;">
-                    <!-- Real video element -->
-                    <video id="realVideoStream" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    <!-- Real video element with audio enabled -->
+                    <video id="realVideoStream" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
                     
                     <!-- Live indicator -->
                     <div style="position: absolute; top: 15px; left: 15px; background: #ff0000; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; z-index: 10; animation: pulse 2s infinite;">
@@ -1375,7 +1394,7 @@ socket.on('ice_candidate', (data) => {
                             </div>
                             <div style="text-align: right;">
                                 <div style="color: #00ff00;">● Online</div>
-                                <div style="color: #00ff00;">● Live Video</div>
+                                <div style="color: #00ff00;">● Video + Audio</div>
                             </div>
                         </div>
                     </div>
@@ -1386,12 +1405,22 @@ socket.on('ice_candidate', (data) => {
             const realVideo = document.getElementById('realVideoStream');
             if (realVideo && webrtcConnection && webrtcConnection.remoteStream) {
                 realVideo.srcObject = webrtcConnection.remoteStream;
+                realVideo.muted = false;  // Ensure audio is not muted
+                
+                // Log audio track info
+                const audioTracks = webrtcConnection.remoteStream.getAudioTracks();
                 console.log('📹 Real video stream connected');
+                console.log('🎤 Audio tracks in stream:', audioTracks.length);
+                if (audioTracks.length > 0) {
+                    console.log('✅ Audio track:', audioTracks[0].label, 'enabled:', audioTracks[0].enabled);
+                }
             }
             
             // Update status
+            const audioCount = webrtcConnection && webrtcConnection.remoteStream ? 
+                webrtcConnection.remoteStream.getAudioTracks().length : 0;
             document.getElementById('cameraStatus').textContent = 
-                `📹 Live video stream from device: ${selectedDevice} (Real Stream)`;
+                `📹 Live ${audioCount > 0 ? 'video + audio' : 'video'} stream from device: ${selectedDevice} (Real Stream)`;
         }
 
         // Show mobile device camera streaming
@@ -1559,7 +1588,7 @@ socket.on('ice_candidate', (data) => {
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     },
-                    audio: false
+                    audio: true  // Enable audio for local preview
                 };
                 
                 console.log('📹 Requesting camera with constraints:', constraints);
@@ -1571,7 +1600,7 @@ socket.on('ice_candidate', (data) => {
                 // Set video source to real stream
                 video.srcObject = stream;
                 video.autoplay = true;
-                video.muted = true;
+                video.muted = false;  // Enable audio
                 video.playsInline = true;
                 
                 // Wait for video to load
