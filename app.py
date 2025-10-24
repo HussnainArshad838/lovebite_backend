@@ -479,7 +479,7 @@ def get_camera_stream(device_id):
         return jsonify({
             "success": True,
             "device_id": device_id,
-            "stream_url": f"ws://localhost:5055/stream/{device_id}",
+            "stream_url": f"wss://lovebite-backend-j8vr.onrender.com/stream/{device_id}",
             "camera_type": device.get('camera_type', 'back') if installations_collection else 'back',
             "status": "streaming",
             "message": "Camera stream is active"

@@ -20,9 +20,9 @@ cd lovebite_backend
 python3 start_server.py
 ```
 
-The server will start on port 5055 and you can access:
-- **API**: http://localhost:5055
-- **Admin Dashboard**: http://localhost:5055/admin_dashboard.html
+The server is deployed on Render and you can access:
+- **API**: https://lovebite-backend-j8vr.onrender.com
+- **Admin Dashboard**: https://lovebite-backend-j8vr.onrender.com/admin_dashboard.html
 
 ### 2. Update React Native App
 
@@ -35,7 +35,7 @@ The React Native app has been modified to automatically track installations. Whe
 
 ### 3. View Installation Data
 
-Open the admin dashboard at `http://localhost:5055/admin_dashboard.html` to see:
+Open the admin dashboard at `https://lovebite-backend-j8vr.onrender.com/admin_dashboard.html` to see:
 - Total installations
 - Active devices
 - Installations by country
