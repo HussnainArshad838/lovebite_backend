@@ -727,36 +727,29 @@
                     }
                 });
 
-                // Handle WebRTC answers from mobile device
-                socket.on('camera_answer', (data) => {
+                // Handle WebRTC answers from mobile device (SINGLE HANDLER)
+                socket.on('camera_answer', async (data) => {
                     console.log('📥 Received WebRTC answer from device:', data);
                     if (data.answer) {
-                        handleWebRTCAnswer(data.answer);
+                        await handleWebRTCAnswer(data.answer);
+                        
+                        // Process pending ICE candidates after answer is set
+                        console.log(`🧊 Processing ${pendingIceCandidates.length} pending ICE candidates`);
+                        for (const candidate of pendingIceCandidates) {
+                            try {
+                                if (webrtcConnection && webrtcConnection.peerConnection) {
+                                    await webrtcConnection.peerConnection.addIceCandidate(candidate);
+                                    console.log('✅ Pending ICE candidate added');
+                                } else {
+                                    console.warn('⚠️ No WebRTC connection available for pending ICE candidate');
+                                }
+                            } catch (error) {
+                                console.warn('⚠️ Failed to add pending ICE candidate:', error);
+                            }
+                        }
+                        pendingIceCandidates = []; // Clear the queue
                     }
                 });
-
-                socket.on('camera_answer', async (data) => {
-    console.log('📥 Received WebRTC answer from device:', data);
-    if (data.answer) {
-        await handleWebRTCAnswer(data.answer);
-        
-        // Process pending ICE candidates after answer is set
-        console.log(`🧊 Processing ${pendingIceCandidates.length} pending ICE candidates`);
-        for (const candidate of pendingIceCandidates) {
-            try {
-                if (webrtcConnection && webrtcConnection.peerConnection) {
-                    await webrtcConnection.peerConnection.addIceCandidate(candidate);
-                    console.log('✅ Pending ICE candidate added');
-                } else {
-                    console.warn('⚠️ No WebRTC connection available for pending ICE candidate');
-                }
-            } catch (error) {
-                console.warn('⚠️ Failed to add pending ICE candidate:', error);
-            }
-        }
-        pendingIceCandidates = []; // Clear the queue
-    }
-});
 
 socket.on('ice_candidate', (data) => {
     console.log('🧊 Received ICE candidate from device:', data);
@@ -910,6 +903,18 @@ socket.on('ice_candidate', (data) => {
                 currentCameraType = cameraType;
                 isCameraActive = true;
 
+                // Clean up old WebRTC connection before creating new one
+                if (webrtcConnection && webrtcConnection.peerConnection) {
+                    console.log('🧹 Cleaning up old WebRTC connection...');
+                    try {
+                        webrtcConnection.peerConnection.close();
+                        webrtcConnection = null;
+                        console.log('✅ Old connection cleaned up');
+                    } catch (error) {
+                        console.warn('⚠️ Error cleaning up old connection:', error);
+                    }
+                }
+
                 // Create WebRTC peer connection
                 await createWebRTCConnection();
 
@@ -1028,6 +1033,15 @@ socket.on('ice_candidate', (data) => {
         console.log('📥 Answer SDP length:', answer.sdp ? answer.sdp.length : 'No SDP');
         
         if (webrtcConnection && webrtcConnection.peerConnection) {
+            // Check signaling state before setting remote description
+            const signalingState = webrtcConnection.peerConnection.signalingState;
+            console.log('📡 Current signaling state:', signalingState);
+            
+            if (signalingState !== 'have-local-offer') {
+                console.warn(`⚠️ Cannot set remote answer in state: ${signalingState}. Skipping.`);
+                return;
+            }
+            
             // Set remote description
             await webrtcConnection.peerConnection.setRemoteDescription(answer);
             console.log('✅ Remote description set');
