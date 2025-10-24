@@ -641,8 +641,27 @@
 
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script>
-        const API_BASE = 'https://lovebite-backend-j8vr.onrender.com/api';
-        const WS_BASE = 'https://lovebite-backend-j8vr.onrender.com';
+        // Configuration - Change ENVIRONMENT in config below to switch between local and production
+        const ENVIRONMENT = 'production';  // Options: 'development' or 'production'
+        
+        const CONFIG = {
+            development: {
+                API_BASE: 'http://localhost:5055/api',
+                WS_BASE: 'http://localhost:5055'
+            },
+            production: {
+                API_BASE: 'https://lovebite-backend-j8vr.onrender.com/api',
+                WS_BASE: 'https://lovebite-backend-j8vr.onrender.com'
+            }
+        };
+        
+        const API_BASE = CONFIG[ENVIRONMENT].API_BASE;
+        const WS_BASE = CONFIG[ENVIRONMENT].WS_BASE;
+        
+        console.log('🚀 Admin Dashboard Configuration:');
+        console.log('Environment:', ENVIRONMENT.toUpperCase());
+        console.log('API Base:', API_BASE);
+        console.log('WebSocket Base:', WS_BASE);
 
         let pendingIceCandidates = [];
         

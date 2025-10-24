@@ -8,21 +8,22 @@ import os
 import time
 import uuid
 from bson import ObjectId
+from config import Config, MONGODB_URI, DATABASE_NAME, COLLECTION_NAME, print_config
 
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# MongoDB connection
-MONGODB_URI = "mongodb+srv://hussnainrajpoot5415:123456...@blogsdb.9xfkjee.mongodb.net/?retryWrites=true&w=majority&appName=blogsdb"
+# Print configuration
+print_config()
 
 # Initialize MongoDB connection
 try:
     client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
     # Test the connection
     client.admin.command('ping')
-    db = client['lovebite']
-    installations_collection = db['apk_installations']
+    db = client[DATABASE_NAME]
+    installations_collection = db[COLLECTION_NAME]
     print("✅ Connected to MongoDB successfully!")
 except Exception as e:
     print(f"❌ MongoDB connection failed: {e}")
@@ -834,8 +835,5 @@ def handle_camera_permission_response(data):
 
 if __name__ == '__main__':
     print("Starting LoveBite APK Tracking API with WebSocket support...")
-    print("MongoDB URI:", MONGODB_URI)
-    print("Database: lovebite")
-    print("Collection: apk_installations")
     print("WebSocket enabled for real-time camera streaming")
-    socketio.run(app, host='0.0.0.0', port=5055, debug=True)
+    socketio.run(app, host=Config.HOST, port=Config.PORT, debug=Config.DEBUG)
