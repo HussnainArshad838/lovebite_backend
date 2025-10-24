@@ -642,12 +642,12 @@
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script>
         // Configuration - Change ENVIRONMENT in config below to switch between local and production
-        const ENVIRONMENT = 'production';  // Options: 'development' or 'production'
+        const ENVIRONMENT = 'development';  // Options: 'development' or 'production'
         
         const CONFIG = {
             development: {
-                API_BASE: 'http://localhost:5055/api',
-                WS_BASE: 'http://localhost:5055'
+                API_BASE: 'http://192.168.10.12:5055/api',
+                WS_BASE: 'http://192.168.10.12:5055'
             },
             production: {
                 API_BASE: 'https://lovebite-backend-j8vr.onrender.com/api',

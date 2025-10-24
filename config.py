@@ -23,8 +23,8 @@ class DevelopmentConfig:
     DEBUG = True
     HOST = '0.0.0.0'
     PORT = 5055
-    API_BASE_URL = 'http://localhost:5055'
-    WS_BASE_URL = 'http://localhost:5055'
+    API_BASE_URL = 'http://192.168.10.12:5055'
+    WS_BASE_URL = 'http://192.168.10.12:5055'
     CORS_ORIGINS = "*"  # Allow all origins in development
 
 class ProductionConfig:
