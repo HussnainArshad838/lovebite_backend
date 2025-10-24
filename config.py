@@ -7,9 +7,9 @@ import os
 
 # Environment mode: 'development' or 'production'
 # Change this to switch between local and live URLs
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')  # Change to 'development' for local testing
+# ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')  # Change to 'development' for local testing
 # Environment mode: 'development' or 'production'
-# ENVIRONMENT = os.getenv('ENVIRONMENT', 'production')  # Change to 'development' for local testing
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'production')  # Change to 'development' for local testing
 
 # Database Configuration
 # MongoDB Atlas Connection String
