@@ -23,8 +23,8 @@ class DevelopmentConfig:
     DEBUG = True
     HOST = '0.0.0.0'
     PORT = 5055
-    API_BASE_URL = 'http://192.168.10.12:5055'
-    WS_BASE_URL = 'http://192.168.10.12:5055'
+    API_BASE_URL = 'http://192.168.137.23:5055'
+    WS_BASE_URL = 'http://192.168.137.23:5055'
     CORS_ORIGINS = "*"  # Allow all origins in development
 
 class ProductionConfig:
@@ -32,8 +32,8 @@ class ProductionConfig:
     DEBUG = False
     HOST = '0.0.0.0'
     PORT = int(os.getenv('PORT', 5055))  # Render provides PORT env variable
-    API_BASE_URL = 'https://lovebite-backend-j8vr.onrender.com'
-    WS_BASE_URL = 'https://lovebite-backend-j8vr.onrender.com'
+    API_BASE_URL = 'https://lovebite-backend-1.onrender.com'
+    WS_BASE_URL = 'https://lovebite-backend-1.onrender.com'
     CORS_ORIGINS = "*"  # Configure specific origins in production
 
 # Select configuration based on environment

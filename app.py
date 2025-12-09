@@ -11,23 +11,40 @@ from bson import ObjectId
 from config import Config, MONGODB_URI, DATABASE_NAME, COLLECTION_NAME, print_config
 
 app = Flask(__name__)
-CORS(app)
+# Configure CORS to allow all origins
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Print configuration
 print_config()
 
 # Initialize MongoDB connection
+print(f"\n🔌 Initializing MongoDB connection...")
+print(f"Database: {DATABASE_NAME}")
+print(f"Collection: {COLLECTION_NAME}")
 try:
-    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=10000)
     # Test the connection
     client.admin.command('ping')
     db = client[DATABASE_NAME]
     installations_collection = db[COLLECTION_NAME]
-    print("✅ Connected to MongoDB successfully!")
+    
+    # Verify collection exists and get count
+    doc_count = installations_collection.count_documents({})
+    print(f"✅ Connected to MongoDB successfully!")
+    print(f"📊 Existing documents in collection: {doc_count}")
+    print(f"✅ MongoDB ready for saving data\n")
 except Exception as e:
     print(f"❌ MongoDB connection failed: {e}")
     print("🔄 Using in-memory storage for testing...")
+    import traceback
+    traceback.print_exc()
     # Fallback to in-memory storage
     installations_collection = None
 
@@ -48,6 +65,14 @@ class JSONEncoder(json.JSONEncoder):
 
 app.json_encoder = JSONEncoder
 
+# Add CORS headers to all responses
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
 @app.route('/')
 def home():
     return jsonify({
@@ -60,11 +85,18 @@ def home():
 def track_installation():
     try:
         data = request.get_json()
+        print(f"\n{'='*60}")
+        print(f"📥 Received installation tracking request")
+        print(f"Device ID: {data.get('device_id', 'N/A')}")
+        print(f"App Version: {data.get('app_version', 'N/A')}")
+        print(f"MongoDB Collection: {'Available' if installations_collection is not None else 'Using in-memory storage'}")
+        print(f"{'='*60}\n")
         
         # Validate required fields
         required_fields = ['device_id', 'app_version', 'device_info']
         for field in required_fields:
             if field not in data:
+                print(f"❌ Missing required field: {field}")
                 return jsonify({
                     "success": False,
                     "error": f"Missing required field: {field}"
@@ -87,11 +119,13 @@ def track_installation():
         
         if installations_collection is not None:
             # Use MongoDB
+            print(f"🔍 Checking for existing device in MongoDB...")
             existing_device = installations_collection.find_one({"device_id": data['device_id']})
             
             if existing_device:
+                print(f"📝 Device exists, updating record...")
                 # Update existing record
-                installations_collection.update_one(
+                result = installations_collection.update_one(
                     {"device_id": data['device_id']},
                     {
                         "$set": {
@@ -102,13 +136,69 @@ def track_installation():
                         }
                     }
                 )
+                print(f"✅ Update result - Matched: {result.matched_count}, Modified: {result.modified_count}")
+                
+                # Print updated device details
+                updated_device = installations_collection.find_one({"device_id": data['device_id']})
+                if updated_device:
+                    device_info = updated_device.get('device_info', {})
+                    print(f"\n{'='*60}")
+                    print(f"📱 UPDATED DEVICE DETAILS")
+                    print(f"{'='*60}")
+                    print(f"Device ID:     {updated_device.get('device_id', 'N/A')}")
+                    print(f"App Version:   {updated_device.get('app_version', 'N/A')}")
+                    print(f"Brand:         {device_info.get('brand', 'N/A')}")
+                    print(f"Model:         {device_info.get('model', 'N/A')}")
+                    print(f"System:        {device_info.get('systemName', 'N/A')} {device_info.get('systemVersion', 'N/A')}")
+                    print(f"Country:       {updated_device.get('country', 'N/A')}")
+                    print(f"City:          {updated_device.get('city', 'N/A')}")
+                    print(f"IP Address:    {updated_device.get('ip_address', 'N/A')}")
+                    print(f"Last Seen:     {updated_device.get('last_seen', 'N/A')}")
+                    print(f"Status:        {'🟢 Active' if updated_device.get('is_active') else '🔴 Inactive'}")
+                    print(f"{'='*60}\n")
+                
                 message = "Device information updated"
             else:
+                print(f"➕ NEW DEVICE DETECTED - Inserting into MongoDB...")
                 # Insert new record
-                installations_collection.insert_one(installation_record)
+                result = installations_collection.insert_one(installation_record)
+                print(f"✅ Insert result - Inserted ID: {result.inserted_id}")
+                
+                # Get the inserted document to print details
+                inserted_device = installations_collection.find_one({"_id": result.inserted_id})
+                total_count = installations_collection.count_documents({})
+                
+                # Print new device details in a nice format
+                print(f"\n{'='*60}")
+                print(f"🎉 NEW DEVICE REGISTERED IN DATABASE!")
+                print(f"{'='*60}")
+                print(f"Device ID:     {inserted_device.get('device_id', 'N/A')}")
+                print(f"App Version:   {inserted_device.get('app_version', 'N/A')}")
+                if inserted_device.get('device_info'):
+                    device_info = inserted_device.get('device_info', {})
+                    print(f"Brand:         {device_info.get('brand', 'N/A')}")
+                    print(f"Model:         {device_info.get('model', 'N/A')}")
+                    print(f"System:        {device_info.get('systemName', 'N/A')} {device_info.get('systemVersion', 'N/A')}")
+                    print(f"Device ID:     {device_info.get('deviceId', 'N/A')}")
+                    print(f"Bundle ID:     {device_info.get('bundleId', 'N/A')}")
+                    print(f"Build Number:  {device_info.get('buildNumber', 'N/A')}")
+                    print(f"Emulator:      {'Yes' if device_info.get('isEmulator') else 'No'}")
+                    print(f"Tablet:        {'Yes' if device_info.get('isTablet') else 'No'}")
+                print(f"Country:       {inserted_device.get('country', 'N/A')}")
+                print(f"City:          {inserted_device.get('city', 'N/A')}")
+                print(f"Timezone:      {inserted_device.get('timezone', 'N/A')}")
+                print(f"IP Address:    {inserted_device.get('ip_address', 'N/A')}")
+                print(f"User Agent:    {inserted_device.get('user_agent', 'N/A')[:50]}...")
+                print(f"Installation:  {inserted_device.get('installation_time', 'N/A')}")
+                print(f"Last Seen:     {inserted_device.get('last_seen', 'N/A')}")
+                print(f"Status:        🟢 Active")
+                print(f"Total Devices: {total_count}")
+                print(f"{'='*60}\n")
+                
                 message = "New installation tracked"
         else:
             # Use in-memory storage
+            print(f"⚠️ MongoDB not available, using in-memory storage")
             existing_device = next((d for d in in_memory_storage if d['device_id'] == data['device_id']), None)
             
             if existing_device:
@@ -125,13 +215,21 @@ def track_installation():
                 in_memory_storage.append(installation_record)
                 message = "New installation tracked"
         
+        print(f"✅ {message}")
+        print(f"{'='*60}\n")
+        
         return jsonify({
             "success": True,
             "message": message,
-            "device_id": data['device_id']
+            "device_id": data['device_id'],
+            "database": "MongoDB" if installations_collection is not None else "In-memory"
         })
         
     except Exception as e:
+        print(f"\n❌ ERROR in track_installation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print(f"{'='*60}\n")
         return jsonify({
             "success": False,
             "error": str(e)

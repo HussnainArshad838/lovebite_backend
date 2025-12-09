@@ -14,8 +14,8 @@ const CONFIG = {
         DEBUG: true
     },
     production: {
-        API_BASE: 'https://lovebite-backend-j8vr.onrender.com/api',
-        WS_BASE: 'https://lovebite-backend-j8vr.onrender.com',
+        API_BASE: 'https://lovebite-backend-1.onrender.com/api',
+        WS_BASE: 'https://lovebite-backend-1.onrender.com',
         DEBUG: false
     }
 };

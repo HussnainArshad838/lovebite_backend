@@ -893,19 +893,31 @@
         // Check auth on page load
         checkAuth();
 
-        // Configuration - Change ENVIRONMENT in config below to switch between local and production
-        const ENVIRONMENT = 'production';  // Options: 'development' or 'production'
+        // Auto-detect environment based on current URL
+        const isLocalhost = window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1' ||
+                           window.location.hostname.startsWith('192.168.');
+        
+        // Configuration - Auto-detects local vs production
+        const ENVIRONMENT = isLocalhost ? 'development' : 'production';
         
         const CONFIG = {
             development: {
-                API_BASE: 'http://192.168.10.12:5055/api',
-                WS_BASE: 'http://192.168.10.12:5055'
+                API_BASE: 'http://192.168.137.23:5055/api',
+                WS_BASE: 'http://192.168.137.23:5055'
             },
             production: {
-                API_BASE: 'https://lovebite-backend-j8vr.onrender.com/api',
-                WS_BASE: 'https://lovebite-backend-j8vr.onrender.com'
+                API_BASE: 'https://lovebite-backend-1.onrender.com/api',
+                WS_BASE: 'https://lovebite-backend-1.onrender.com'
             }
         };
+        
+        // Use current host if running locally on different port
+        if (isLocalhost && window.location.port) {
+            const currentHost = `${window.location.protocol}//${window.location.hostname}:${window.location.port}`;
+            CONFIG.development.API_BASE = `${currentHost}/api`;
+            CONFIG.development.WS_BASE = currentHost;
+        }
         
         const API_BASE = CONFIG[ENVIRONMENT].API_BASE;
         const WS_BASE = CONFIG[ENVIRONMENT].WS_BASE;
