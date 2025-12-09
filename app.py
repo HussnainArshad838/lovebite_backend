@@ -19,7 +19,15 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Configure SocketIO for better compatibility with Render
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",
+    async_mode='threading',  # Use threading for better compatibility
+    ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=1e8
+)
 
 # Print configuration
 print_config()

